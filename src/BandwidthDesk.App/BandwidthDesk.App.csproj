@@ -8,12 +8,17 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>BandwidthDesk</AssemblyName>
     <RootNamespace>BandwidthDesk.App</RootNamespace>
-    <ApplicationIcon></ApplicationIcon>
+    <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\BandwidthDesk.Core\BandwidthDesk.Core.csproj" />
     <ProjectReference Include="..\BandwidthDesk.Engine.WinDivert\BandwidthDesk.Engine.WinDivert.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\icon.ico" />
+    <Resource Include="Resources\icon.png" />
   </ItemGroup>
 
   <ItemGroup>

@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:BandwidthDesk.App.ViewModels"
         Title="BandwidthDesk Settings"
+        Icon="pack://application:,,,/Resources/icon.ico"
         SizeToContent="Height" Width="780"
         MaxHeight="860" MinWidth="700"
         WindowStartupLocation="CenterOwner"

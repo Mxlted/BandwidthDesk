@@ -4,11 +4,22 @@ obj/
 *.user
 *.suo
 *.userprefs
+*.tlog
+*.binlog
+*.cache
+project.lock.json
+project.assets.json
+*.nuget.props
+*.nuget.targets
+*.pdb
+*.dll.config
 
 # Rider / VS / VSCode
 .idea/
 .vs/
 .vscode/
+*.sln.iml
+.fleet/
 
 # Resharper
 _ReSharper*/
@@ -33,17 +44,25 @@ native/**/*.sys
 
 # OS / editor cruft
 Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
 .DS_Store
 
-# MSIX / publish
+# MSIX / publish / distribution output
 publish/
+build/
+dist/
 *.appx
 *.appxbundle
 *.msix
+*.msi
 
-# Coverage
+# Coverage / test output
 coverage*/
 TestResults/
+*.coverage
+*.trx
 
 # Local environment / secrets
 *.env
@@ -54,14 +73,10 @@ secrets.json
 *.pfx
 *.snk
 
-# Windows shell cruft
-desktop.ini
-$RECYCLE.BIN/
-ehthumbs.db
-
 # Editor backups / swap files
 *~
 *.bak
 *.swp
 *.tmp
 *.orig
+*.rej

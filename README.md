@@ -45,13 +45,23 @@ WinDivert is dual-licensed (LGPL or GPL). Check its license if you plan to redis
 The easy way is `build.bat`:
 
 ```cmd
-build.bat            :: Release build
-build.bat debug      :: Debug build
-build.bat run        :: Release build, then launch elevated
-build.bat clean      :: clean every bin/ and obj/
+build.bat              :: Release build
+build.bat debug        :: Debug build
+build.bat run          :: Release build, then launch elevated
+build.bat clean        :: clean every bin/ and obj/ and the build/ folder
+build.bat publish      :: Self-contained x64 publish into build\publish\
+build.bat portable     :: publish + zip into build\BandwidthDesk-<ver>-portable-x64.zip
+build.bat installer    :: publish + Inno Setup into build\BandwidthDesk-<ver>-setup-x64.exe
+build.bat dist         :: publish + portable + installer (the full distribution bundle)
 ```
 
 The script will close any running copy of the app first so files aren't locked.
+
+### Distribution
+
+* **Portable** (`build.bat portable`) produces a self-contained zip in `build/`. No .NET runtime required on the target machine — just unzip and run `BandwidthDesk.exe` elevated. WinDivert.dll and WinDivert64.sys are bundled inside.
+* **Installer** (`build.bat installer`) needs [Inno Setup 6](https://jrsoftware.org/isdl.php) installed (the script looks for `iscc.exe` on PATH and in the usual Program Files locations). The script is `installer\BandwidthDesk.iss`. The installer writes to `%ProgramFiles%\BandwidthDesk`, adds Start Menu / optional desktop shortcut, and registers an uninstaller. Per-user data in `%LOCALAPPDATA%\BandwidthDesk` is preserved across reinstalls.
+* Both outputs land in `build/` at the repo root.
 
 Without the script:
 

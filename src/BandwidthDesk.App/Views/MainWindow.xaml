@@ -5,6 +5,7 @@
         xmlns:vm="clr-namespace:BandwidthDesk.App.ViewModels"
         xmlns:conv="clr-namespace:BandwidthDesk.App.Converters"
         Title="BandwidthDesk" Height="760" Width="1280"
+        Icon="pack://application:,,,/Resources/icon.ico"
         WindowStartupLocation="CenterScreen"
         MinHeight="560" MinWidth="980"
         TextOptions.TextFormattingMode="Ideal"
