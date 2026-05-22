@@ -1,0 +1,99 @@
+<Window x:Class="BandwidthDesk.App.Views.RuleEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Bandwidth rule" Height="480" Width="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        UseLayoutRounding="True">
+    <Border Background="{DynamicResource Brush.Bg}" Padding="22">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Text="Bandwidth rule" Style="{StaticResource Text.Display}" Margin="0,0,0,4" />
+            <TextBlock Grid.Row="0" Text="Match a process, set per-direction caps" Style="{StaticResource Text.Muted}"
+                       VerticalAlignment="Bottom" Margin="0,0,0,-22" />
+
+            <StackPanel Grid.Row="1" Margin="0,30,0,14">
+                <TextBlock Text="Display name" Style="{StaticResource Text.Subtle}" Margin="0,0,0,6" />
+                <TextBox x:Name="NameBox" />
+            </StackPanel>
+
+            <Grid Grid.Row="2" Margin="0,0,0,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="170" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Match by" Style="{StaticResource Text.Subtle}" Margin="0,0,0,6" />
+                    <ComboBox x:Name="MatchKindBox" SelectionChanged="MatchKindBox_SelectionChanged">
+                        <ComboBoxItem Content="Executable name" Tag="ExecutableName" />
+                        <ComboBoxItem Content="Process ID" Tag="ProcessId" />
+                        <ComboBoxItem Content="Executable path" Tag="ExecutablePath" />
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                    <TextBlock x:Name="MatchValueLabel" Text="Value" Style="{StaticResource Text.Subtle}" Margin="0,0,0,6" />
+                    <TextBox x:Name="MatchValueBox" />
+                </StackPanel>
+            </Grid>
+
+            <Grid Grid.Row="3" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Download limit" Style="{StaticResource Text.Subtle}" Margin="0,0,0,6" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="6" />
+                            <ColumnDefinition Width="86" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" x:Name="DownloadValueBox"
+                                 PreviewTextInput="NumericOnly_PreviewTextInput"
+                                 DataObject.Pasting="NumericOnly_OnPaste" />
+                        <ComboBox Grid.Column="2" x:Name="DownloadUnitBox" />
+                    </Grid>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="Upload limit" Style="{StaticResource Text.Subtle}" Margin="0,0,0,6" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="6" />
+                            <ColumnDefinition Width="86" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" x:Name="UploadValueBox"
+                                 PreviewTextInput="NumericOnly_PreviewTextInput"
+                                 DataObject.Pasting="NumericOnly_OnPaste" />
+                        <ComboBox Grid.Column="2" x:Name="UploadUnitBox" />
+                    </Grid>
+                </StackPanel>
+            </Grid>
+
+            <TextBlock Grid.Row="4" Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,0,0,10"
+                       Text="Set a limit to 0 to leave that direction unlimited. KB/s = 1024 bytes/s." />
+
+            <CheckBox Grid.Row="5" x:Name="EnabledBox" Content="Enabled" Margin="0,4,0,14" />
+
+            <TextBlock Grid.Row="6" x:Name="ErrorText" Foreground="{DynamicResource Brush.Danger}"
+                       TextWrapping="Wrap" VerticalAlignment="Top" />
+
+            <StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                <Button Content="Cancel" Click="Cancel_Click" Margin="0,0,8,0" MinWidth="88" />
+                <Button Style="{StaticResource Button.Accent}" Content="Save" Click="Save_Click" MinWidth="88" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

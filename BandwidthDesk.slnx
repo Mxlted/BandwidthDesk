@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BandwidthDesk.App/BandwidthDesk.App.csproj" />
+    <Project Path="src/BandwidthDesk.Core/BandwidthDesk.Core.csproj" />
+    <Project Path="src/BandwidthDesk.Engine.WinDivert/BandwidthDesk.Engine.WinDivert.csproj" />
+  </Folder>
+</Solution>

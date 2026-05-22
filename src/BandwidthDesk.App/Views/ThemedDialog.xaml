@@ -1,0 +1,46 @@
+<Window x:Class="BandwidthDesk.App.Views.ThemedDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="BandwidthDesk"
+        SizeToContent="Height" Width="440"
+        MinHeight="160"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Ideal"
+        Background="{DynamicResource Brush.Bg}"
+        Foreground="{DynamicResource Brush.Text}"
+        FontFamily="{StaticResource Font.Default}"
+        FontSize="13">
+    <Border Background="{DynamicResource Brush.Bg}" Padding="22">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                <TextBlock x:Name="IconText" FontSize="22" Margin="0,0,12,0"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource Brush.Accent}" />
+                <TextBlock x:Name="HeaderText" Style="{StaticResource Text.Header}"
+                           VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="340" />
+            </StackPanel>
+
+            <TextBlock Grid.Row="1" x:Name="MessageText"
+                       Style="{StaticResource Text.Muted}"
+                       TextWrapping="Wrap" Margin="0,0,0,18" />
+
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="NoButton" Content="No" MinWidth="88" Margin="0,0,8,0"
+                        Click="No_Click" Visibility="Collapsed" />
+                <Button x:Name="CancelButton" Content="Cancel" MinWidth="88" Margin="0,0,8,0"
+                        Click="Cancel_Click" Visibility="Collapsed" />
+                <Button x:Name="PrimaryButton" Content="OK" MinWidth="96"
+                        Style="{StaticResource Button.Accent}" Click="Primary_Click" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

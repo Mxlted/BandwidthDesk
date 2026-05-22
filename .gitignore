@@ -1,0 +1,67 @@
+# Build output
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+
+# Rider / VS / VSCode
+.idea/
+.vs/
+.vscode/
+
+# Resharper
+_ReSharper*/
+*.DotSettings.user
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# Logs (runtime)
+logs/
+*.log
+
+# Native binaries — fetched separately; not checked in
+native/x64/WinDivert.dll
+native/x64/WinDivert64.sys
+native/**/*.dll
+native/**/*.sys
+!native/x64/.gitkeep
+
+# OS / editor cruft
+Thumbs.db
+.DS_Store
+
+# MSIX / publish
+publish/
+*.appx
+*.appxbundle
+*.msix
+
+# Coverage
+coverage*/
+TestResults/
+
+# Local environment / secrets
+*.env
+.env.*
+*.local.json
+appsettings.Local.json
+secrets.json
+*.pfx
+*.snk
+
+# Windows shell cruft
+desktop.ini
+$RECYCLE.BIN/
+ehthumbs.db
+
+# Editor backups / swap files
+*~
+*.bak
+*.swp
+*.tmp
+*.orig
