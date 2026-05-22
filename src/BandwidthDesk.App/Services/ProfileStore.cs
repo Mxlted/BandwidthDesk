@@ -140,13 +140,38 @@ public sealed class ProfileStore
         try
         {
             await using var fs = File.OpenRead(path);
-            return await JsonSerializer.DeserializeAsync<Profile>(fs, Json).ConfigureAwait(false);
+            var profile = await JsonSerializer.DeserializeAsync<Profile>(fs, Json).ConfigureAwait(false);
+            return NormalizeProfile(profile);
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "Failed to read profile from {Path}", path);
             return null;
         }
+    }
+
+    private static Profile? NormalizeProfile(Profile? profile)
+    {
+        if (profile is null) return null;
+
+        profile.SchemaVersion ??= "1";
+        profile.Name ??= string.Empty;
+
+        var rules = new List<BandwidthRule>();
+        if (profile.Rules is not null)
+        {
+            foreach (var rule in profile.Rules)
+            {
+                if (rule is null) continue;
+                if (rule.Id == Guid.Empty) rule.Id = Guid.NewGuid();
+                rule.Name ??= string.Empty;
+                rule.MatchValue ??= string.Empty;
+                rules.Add(rule);
+            }
+        }
+        profile.Rules = rules;
+
+        return profile;
     }
 
     private static string SanitizeFileName(string name)

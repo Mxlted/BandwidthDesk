@@ -129,7 +129,11 @@ public sealed class TrayIconService : IDisposable
             var resource = System.Windows.Application.GetResourceStream(
                 new Uri("pack://application:,,,/Resources/icon.ico", UriKind.Absolute));
             if (resource?.Stream is not null)
-                return new Icon(resource.Stream);
+            {
+                using var stream = resource.Stream;
+                using var icon = new Icon(stream);
+                return (Icon)icon.Clone();
+            }
         }
         catch (Exception ex)
         {

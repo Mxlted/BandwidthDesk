@@ -55,13 +55,13 @@ internal static class WinDivertNative
 
     /// <summary>
     /// WINDIVERT_ADDRESS — packet metadata. The struct layout is fixed at 80 bytes in WinDivert 2.x.
-    /// We marshal only the fields we need.
+    /// Network.IfIdx/SubIfIdx live at the start of the layer-specific union.
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 80)]
     public struct Address
     {
         public long Timestamp;        // QueryPerformanceCounter ticks
-        public uint LayerFlags;       // packed: layer:8 event:8 flags:16
+        public ulong LayerFlags;      // packed bitfields: layer:8 event:8 flags...
         public uint IfIdx;            // interface index (network layer)
         public uint SubIfIdx;         // sub-interface
         // remaining bytes for union content
@@ -75,22 +75,20 @@ internal static class WinDivertNative
 
         public byte Layer => (byte)(LayerFlags & 0xFF);
         public byte Event => (byte)((LayerFlags >> 8) & 0xFF);
-        public ushort Flags => (ushort)((LayerFlags >> 16) & 0xFFFF);
+        public ulong Flags => LayerFlags >> 16;
 
         public bool Outbound
         {
-            // bit 0 of Flags = Sniffed, bit 1 = Outbound, bit 2 = Loopback, bit 3 = Impostor, bit 4 = IPv6
-            // (per WinDivert 2 docs, packed into flags low byte)
-            get => (Flags & 0x0002) != 0;
+            // Flag bits: Sniffed=0, Outbound=1, Loopback=2, Impostor=3, IPv6=4.
+            get => (Flags & 0x0002UL) != 0;
             set
             {
-                ushort f = Flags;
-                if (value) f |= 0x0002; else f &= unchecked((ushort)~0x0002);
-                LayerFlags = (LayerFlags & 0x0000_FFFF) | ((uint)f << 16);
+                if (value) LayerFlags |= 1UL << 17;
+                else LayerFlags &= ~(1UL << 17);
             }
         }
 
-        public bool IsIPv6 => (Flags & 0x0010) != 0;
+        public bool IsIPv6 => (Flags & 0x0010UL) != 0;
     }
 
     [DllImport(Dll, SetLastError = true, CharSet = CharSet.Ansi)]

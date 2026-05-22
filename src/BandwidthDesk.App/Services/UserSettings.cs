@@ -81,7 +81,13 @@ public static class UserSettingsStore
     {
         try
         {
-            File.WriteAllText(Path, JsonSerializer.Serialize(settings, Json));
+            var dir = System.IO.Path.GetDirectoryName(Path);
+            if (!string.IsNullOrEmpty(dir))
+                Directory.CreateDirectory(dir);
+
+            var tempPath = Path + ".tmp";
+            File.WriteAllText(tempPath, JsonSerializer.Serialize(settings, Json));
+            File.Move(tempPath, Path, overwrite: true);
         }
         catch (Exception ex)
         {

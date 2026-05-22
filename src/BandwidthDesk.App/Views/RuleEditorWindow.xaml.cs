@@ -193,9 +193,14 @@ public partial class RuleEditorWindow : Window
             if (!double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out v))
                 return -1;
         }
-        if (v <= 0) return 0;
+        if (double.IsNaN(v) || double.IsInfinity(v)) return -1;
+        if (v < 0) return -1;
+        if (v == 0) return 0;
+
         if (unitIndex < 0 || unitIndex >= Units.Length) unitIndex = 0;
-        return (long)Math.Round(v * Units[unitIndex].Multiplier);
+        double bytesPerSecond = v * Units[unitIndex].Multiplier;
+        if (double.IsInfinity(bytesPerSecond) || bytesPerSecond > long.MaxValue) return -1;
+        return (long)Math.Round(bytesPerSecond);
     }
 
     // Numeric-only input: digits + a single decimal separator.

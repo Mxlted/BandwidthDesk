@@ -83,11 +83,15 @@ public partial class App : System.Windows.Application
         var hwnd = FindWindow(null, SingleInstanceWindowTitle);
         if (hwnd == IntPtr.Zero) return;
 
-        if (IsIconic(hwnd))
+        if (!IsWindowVisible(hwnd))
+            ShowWindow(hwnd, SW_SHOW);
+        else if (IsIconic(hwnd))
             ShowWindow(hwnd, SW_RESTORE);
+
         SetForegroundWindow(hwnd);
     }
 
+    private const int SW_SHOW = 5;
     private const int SW_RESTORE = 9;
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -100,6 +104,10 @@ public partial class App : System.Windows.Application
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

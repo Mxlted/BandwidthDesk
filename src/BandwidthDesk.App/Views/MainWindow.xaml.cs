@@ -29,6 +29,7 @@ public partial class MainWindow : Window
         App.Services.TrayIcon.RestoreRequested += TrayIcon_RestoreRequested;
         App.Services.TrayIcon.ExitRequested += TrayIcon_ExitRequested;
         App.Services.TrayIcon.ApplySettings(UserSettingsStore.Load());
+        System.Windows.Application.Current.SessionEnding += MainWindow_SessionEnding;
 
         SourceInitialized += (_, _) => RestoreWindowPlacement();
         StateChanged += MainWindow_StateChanged;
@@ -62,8 +63,14 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
+        System.Windows.Application.Current.SessionEnding -= MainWindow_SessionEnding;
         App.Services.TrayIcon.RestoreRequested -= TrayIcon_RestoreRequested;
         App.Services.TrayIcon.ExitRequested -= TrayIcon_ExitRequested;
+    }
+
+    private void MainWindow_SessionEnding(object sender, SessionEndingCancelEventArgs e)
+    {
+        _allowClose = true;
     }
 
     private void TrayIcon_RestoreRequested(object? sender, EventArgs e)

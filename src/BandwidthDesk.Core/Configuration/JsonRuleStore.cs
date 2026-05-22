@@ -44,8 +44,8 @@ public sealed class JsonRuleStore : IRuleStore
             }
 
             await using var stream = File.OpenRead(_path);
-            var rules = await JsonSerializer.DeserializeAsync<List<BandwidthRule>>(stream, JsonOptions, ct).ConfigureAwait(false);
-            return rules ?? new List<BandwidthRule>();
+            var rules = await JsonSerializer.DeserializeAsync<List<BandwidthRule?>>(stream, JsonOptions, ct).ConfigureAwait(false);
+            return NormalizeRules(rules);
         }
         catch (Exception ex)
         {
@@ -86,5 +86,22 @@ public sealed class JsonRuleStore : IRuleStore
         {
             _gate.Release();
         }
+    }
+
+    private static List<BandwidthRule> NormalizeRules(IEnumerable<BandwidthRule?>? rules)
+    {
+        var normalized = new List<BandwidthRule>();
+        if (rules is null) return normalized;
+
+        foreach (var rule in rules)
+        {
+            if (rule is null) continue;
+            if (rule.Id == Guid.Empty) rule.Id = Guid.NewGuid();
+            rule.Name ??= string.Empty;
+            rule.MatchValue ??= string.Empty;
+            normalized.Add(rule);
+        }
+
+        return normalized;
     }
 }
