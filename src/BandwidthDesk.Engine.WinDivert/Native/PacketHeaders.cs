@@ -46,6 +46,8 @@ internal static class PacketHeaders
         if (version != 4 || ihl < 20 || packet.Length < ihl) return default;
 
         int totalLen = (packet[2] << 8) | packet[3];
+        if (totalLen < ihl || totalLen > packet.Length) return default;
+
         byte protocol = packet[9];
         var src = new IPAddress(packet.Slice(12, 4).ToArray());
         var dst = new IPAddress(packet.Slice(16, 4).ToArray());

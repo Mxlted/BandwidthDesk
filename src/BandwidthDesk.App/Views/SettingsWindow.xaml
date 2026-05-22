@@ -22,6 +22,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Header -->
@@ -92,8 +93,29 @@
             </StackPanel>
         </Border>
 
+        <!-- Window behavior card -->
+        <Border Grid.Row="2" Style="{StaticResource Card}" Padding="18" Margin="0,0,0,14">
+            <StackPanel>
+                <TextBlock Text="Window behavior" Style="{StaticResource Text.Header}" />
+                <TextBlock Text="Keep BandwidthDesk nearby without leaving the main window open."
+                           Style="{StaticResource Text.Subtle}" Margin="0,2,0,12" />
+
+                <CheckBox Content="Minimize to notification area"
+                          IsChecked="{Binding MinimizeToTray, Mode=TwoWay}"
+                          ToolTip="When the main window is minimized, hide it and restore it from the tray icon." />
+                <CheckBox Margin="0,12,0,0"
+                          Content="Close button sends app to notification area"
+                          IsChecked="{Binding CloseToTray, Mode=TwoWay}"
+                          ToolTip="Clicking X hides the window. Use Exit from the tray menu to quit completely." />
+                <CheckBox Margin="0,12,0,0"
+                          Content="Show tray hint the first time the app hides"
+                          IsChecked="{Binding ShowTrayNotifications, Mode=TwoWay}"
+                          ToolTip="Displays a small notification explaining how to restore the app." />
+            </StackPanel>
+        </Border>
+
         <!-- Profiles card -->
-        <Border Grid.Row="2" Style="{StaticResource Card}" Padding="18">
+        <Border Grid.Row="3" Style="{StaticResource Card}" Padding="18">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
                     <TextBlock Text="Profiles" Style="{StaticResource Text.Header}" />
@@ -200,22 +222,25 @@
         </Border>
 
         <!-- Export-current shortcut -->
-        <Grid Grid.Row="3" Margin="0,14,0,0">
+        <Grid Grid.Row="4" Margin="0,14,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock VerticalAlignment="Center" Style="{StaticResource Text.Subtle}" TextWrapping="Wrap"
-                       Text="{Binding ProfilesDirectory, StringFormat='Profiles folder: {0}'}" />
+                       Text="{Binding LogsDirectory, StringFormat='Logs folder: {0}'}" />
             <Button Grid.Column="1" Margin="8,0,6,0" Content="Open profiles folder"
                     Command="{Binding OpenProfilesFolderCommand}" />
-            <Button Grid.Column="2" Content="Open data folder"
+            <Button Grid.Column="2" Margin="0,0,6,0" Content="Open logs folder"
+                    Command="{Binding OpenLogsFolderCommand}" />
+            <Button Grid.Column="3" Content="Open data folder"
                     Command="{Binding OpenDataFolderCommand}" />
         </Grid>
 
         <!-- Status / close -->
-        <Grid Grid.Row="4" Margin="0,14,0,0">
+        <Grid Grid.Row="5" Margin="0,14,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />

@@ -1,16 +1,20 @@
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using BandwidthDesk.App.Services;
 using BandwidthDesk.App.ViewModels;
+using WpfListViewItem = System.Windows.Controls.ListViewItem;
+using WpfTreeViewItem = System.Windows.Controls.TreeViewItem;
 
 namespace BandwidthDesk.App.Views;
 
 public partial class MainWindow : Window
 {
     public MainViewModel ViewModel { get; }
+    private bool _allowClose;
 
     public MainWindow()
     {
@@ -22,10 +26,75 @@ public partial class MainWindow : Window
         // "Administrator: " caption is the most visible chunk of system chrome.
         WindowChrome.ApplyTheme(this, ThemeManager.Current);
         ThemeManager.Changed += (_, t) => Dispatcher.Invoke(() => WindowChrome.ApplyTheme(this, t));
+        App.Services.TrayIcon.RestoreRequested += TrayIcon_RestoreRequested;
+        App.Services.TrayIcon.ExitRequested += TrayIcon_ExitRequested;
+        App.Services.TrayIcon.ApplySettings(UserSettingsStore.Load());
 
         SourceInitialized += (_, _) => RestoreWindowPlacement();
-        Closing += (_, _) => SaveWindowPlacement();
+        StateChanged += MainWindow_StateChanged;
+        Closing += MainWindow_Closing;
+        Closed += MainWindow_Closed;
         Loaded += async (_, _) => await ViewModel.InitializeAsync();
+    }
+
+    private void MainWindow_StateChanged(object? sender, EventArgs e)
+    {
+        var settings = UserSettingsStore.Load();
+        if (WindowState == WindowState.Minimized && settings.MinimizeToTray)
+            HideToTray(settings);
+    }
+
+    private void MainWindow_Closing(object? sender, CancelEventArgs e)
+    {
+        if (!_allowClose)
+        {
+            var settings = UserSettingsStore.Load();
+            if (settings.CloseToTray)
+            {
+                e.Cancel = true;
+                HideToTray(settings);
+                return;
+            }
+        }
+
+        SaveWindowPlacement();
+    }
+
+    private void MainWindow_Closed(object? sender, EventArgs e)
+    {
+        App.Services.TrayIcon.RestoreRequested -= TrayIcon_RestoreRequested;
+        App.Services.TrayIcon.ExitRequested -= TrayIcon_ExitRequested;
+    }
+
+    private void TrayIcon_RestoreRequested(object? sender, EventArgs e)
+    {
+        Dispatcher.Invoke(RestoreFromTray);
+    }
+
+    private void TrayIcon_ExitRequested(object? sender, EventArgs e)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _allowClose = true;
+            Close();
+        });
+    }
+
+    private void HideToTray(UserSettings settings)
+    {
+        SaveWindowPlacement();
+        Hide();
+        App.Services.TrayIcon.NotifyWindowHidden(settings);
+    }
+
+    private void RestoreFromTray()
+    {
+        Show();
+        if (WindowState == WindowState.Minimized)
+            WindowState = WindowState.Normal;
+
+        Activate();
+        App.Services.TrayIcon.NotifyWindowShown(UserSettingsStore.Load());
     }
 
     private void RestoreWindowPlacement()
@@ -112,7 +181,7 @@ public partial class MainWindow : Window
     private void RulesList_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (e.OriginalSource is not DependencyObject src) return;
-        var item = FindAncestor<ListViewItem>(src);
+        var item = FindAncestor<WpfListViewItem>(src);
         if (item is null) return;
         if (ViewModel.EditRuleCommand.CanExecute(null))
             ViewModel.EditRuleCommand.Execute(null);
@@ -124,7 +193,7 @@ public partial class MainWindow : Window
     private void ProcessTree_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (e.OriginalSource is not DependencyObject src) return;
-        var item = FindAncestor<TreeViewItem>(src);
+        var item = FindAncestor<WpfTreeViewItem>(src);
         if (item is null) return;
 
         var node = item.DataContext;
@@ -147,7 +216,7 @@ public partial class MainWindow : Window
     // which is why the selection looked like it was "disappearing" on right-click.
     private void ProcessItem_OnPreviewRightClick(object sender, MouseButtonEventArgs e)
     {
-        if (sender is TreeViewItem tvi && !tvi.IsSelected)
+        if (sender is WpfTreeViewItem tvi && !tvi.IsSelected)
         {
             tvi.Focus();
             tvi.IsSelected = true;

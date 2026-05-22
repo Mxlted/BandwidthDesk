@@ -97,7 +97,7 @@ public sealed class RateActivityConverter : IValueConverter
     {
         long v = value is null ? 0 : System.Convert.ToInt64(value, CultureInfo.InvariantCulture);
         string key = v > 0 ? "Brush.Text" : "Brush.TextSubtle";
-        return Application.Current?.TryFindResource(key) ?? System.Windows.DependencyProperty.UnsetValue;
+        return System.Windows.Application.Current?.TryFindResource(key) ?? System.Windows.DependencyProperty.UnsetValue;
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
@@ -117,7 +117,7 @@ public sealed class EngineStatusToBrushConverter : IValueConverter
                 _ => "Brush.TextSubtle",
             }
             : "Brush.TextSubtle";
-        return Application.Current?.TryFindResource(key) ?? System.Windows.DependencyProperty.UnsetValue;
+        return System.Windows.Application.Current?.TryFindResource(key) ?? System.Windows.DependencyProperty.UnsetValue;
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

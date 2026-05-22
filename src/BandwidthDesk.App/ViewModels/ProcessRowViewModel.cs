@@ -30,8 +30,20 @@ public sealed partial class ProcessRowViewModel : ObservableObject
     public void UpdateInfo(ProcessInfo info)
     {
         var oldMem = Info.WorkingSetBytes;
+        var oldPath = Info.ExecutablePath;
+        var oldDescription = Info.Description;
+        var oldCompany = Info.CompanyName;
+        var oldMicrosoft = Info.IsMicrosoft;
         Info = info;
         if (oldMem != info.WorkingSetBytes) OnPropertyChanged(nameof(WorkingSetBytes));
+        if (oldPath != info.ExecutablePath)
+        {
+            OnPropertyChanged(nameof(ExecutablePath));
+            OnPropertyChanged(nameof(Icon));
+        }
+        if (oldDescription != info.Description) OnPropertyChanged(nameof(Description));
+        if (oldCompany != info.CompanyName) OnPropertyChanged(nameof(CompanyName));
+        if (oldMicrosoft != info.IsMicrosoft) OnPropertyChanged(nameof(IsMicrosoft));
     }
 
     public void NotifyThemeChanged()

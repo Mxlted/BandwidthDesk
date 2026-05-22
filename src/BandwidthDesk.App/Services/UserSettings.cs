@@ -20,6 +20,15 @@ public sealed class UserSettings
     /// <summary>How often the process list refreshes, in seconds. Clamped to 1..30 at use sites.</summary>
     public int ProcessRefreshSeconds { get; set; } = 3;
 
+    /// <summary>Hide the main window and keep the app available from the tray when minimized.</summary>
+    public bool MinimizeToTray { get; set; }
+
+    /// <summary>Hide the main window instead of exiting when the user clicks the close button.</summary>
+    public bool CloseToTray { get; set; }
+
+    /// <summary>Show a one-time tray hint when the app first hides to the notification area.</summary>
+    public bool ShowTrayNotifications { get; set; } = true;
+
     public double? WindowWidth { get; set; }
     public double? WindowHeight { get; set; }
     public double? WindowLeft { get; set; }

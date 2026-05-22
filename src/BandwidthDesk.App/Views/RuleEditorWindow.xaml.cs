@@ -7,6 +7,8 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using BandwidthDesk.App.Services;
 using BandwidthDesk.Core.Models;
+using WpfComboBox = System.Windows.Controls.ComboBox;
+using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace BandwidthDesk.App.Views;
 
@@ -63,7 +65,7 @@ public partial class RuleEditorWindow : Window
         WindowChrome.ApplyTheme(this, ThemeManager.Current);
     }
 
-    private void ApplyValueAndUnit(TextBox valueBox, ComboBox unitBox, long bps)
+    private void ApplyValueAndUnit(WpfTextBox valueBox, WpfComboBox unitBox, long bps)
     {
         if (bps <= 0)
         {
@@ -199,24 +201,24 @@ public partial class RuleEditorWindow : Window
     // Numeric-only input: digits + a single decimal separator.
     private void NumericOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
     {
-        if (sender is not TextBox tb) { e.Handled = true; return; }
+        if (sender is not WpfTextBox tb) { e.Handled = true; return; }
         e.Handled = !IsValidNumericInsertion(tb, e.Text);
     }
 
     private void NumericOnly_OnPaste(object sender, DataObjectPastingEventArgs e)
     {
-        if (sender is not TextBox tb) { e.CancelCommand(); return; }
-        if (!e.SourceDataObject.GetDataPresent(DataFormats.UnicodeText, true))
+        if (sender is not WpfTextBox tb) { e.CancelCommand(); return; }
+        if (!e.SourceDataObject.GetDataPresent(System.Windows.DataFormats.UnicodeText, true))
         {
             e.CancelCommand();
             return;
         }
-        var text = (string)e.SourceDataObject.GetData(DataFormats.UnicodeText, true);
+        var text = (string)e.SourceDataObject.GetData(System.Windows.DataFormats.UnicodeText, true);
         if (!IsValidNumericInsertion(tb, text))
             e.CancelCommand();
     }
 
-    private static bool IsValidNumericInsertion(TextBox tb, string insertion)
+    private static bool IsValidNumericInsertion(WpfTextBox tb, string insertion)
     {
         if (string.IsNullOrEmpty(insertion)) return false;
         var current = tb.Text ?? string.Empty;

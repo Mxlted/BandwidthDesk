@@ -56,6 +56,7 @@ internal sealed class TokenBucket
 
             double needed = bytes - _tokens;
             double seconds = needed / Math.Max(_ratePerSecond, 1);
+            _tokens -= bytes;
             int ms = (int)Math.Ceiling(seconds * 1000);
             return Math.Max(ms, 1);
         }

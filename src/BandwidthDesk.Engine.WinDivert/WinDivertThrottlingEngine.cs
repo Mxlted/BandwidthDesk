@@ -87,9 +87,9 @@ public sealed class WinDivertThrottlingEngine : IThrottlingEngine
                         "Make sure you are running as Administrator and that WinDivert.dll + WinDivert64.sys are next to the executable.");
                 }
 
-                WinDivertNative.WinDivertSetParam(_handle, WinDivertNative.Param.QueueLength, 8192);
-                WinDivertNative.WinDivertSetParam(_handle, WinDivertNative.Param.QueueTime, 2000);
-                WinDivertNative.WinDivertSetParam(_handle, WinDivertNative.Param.QueueSize, 33554432);
+                SetParamOrLog(WinDivertNative.Param.QueueLength, 8192);
+                SetParamOrLog(WinDivertNative.Param.QueueTime, 2000);
+                SetParamOrLog(WinDivertNative.Param.QueueSize, 33554432);
 
                 _cts = new CancellationTokenSource();
                 _worker = new Thread(WorkerLoop)
@@ -183,6 +183,15 @@ public sealed class WinDivertThrottlingEngine : IThrottlingEngine
             catch (Exception ex) { Log.Warning(ex, "WinDivertClose threw"); }
             _handle = WinDivertNative.InvalidHandle;
         }
+    }
+
+    private void SetParamOrLog(WinDivertNative.Param param, ulong value)
+    {
+        if (WinDivertNative.WinDivertSetParam(_handle, param, value))
+            return;
+
+        int err = Marshal.GetLastWin32Error();
+        Log.Warning("WinDivertSetParam failed; param={Param} value={Value} err={Err}", param, value, err);
     }
 
     private void SetStatus(EngineStatus s, string? msg)
@@ -426,7 +435,8 @@ internal sealed class RuleState
     private readonly string _value;
 
     // Cached matched pids -> result, refreshed when needed.
-    private readonly ConcurrentDictionary<int, bool> _pidMatchCache = new();
+    private readonly ConcurrentDictionary<int, PidMatchCacheEntry> _pidMatchCache = new();
+    private static readonly TimeSpan PidMatchCacheTtl = TimeSpan.FromSeconds(10);
 
     public RuleState(BandwidthRule r)
     {
@@ -442,8 +452,12 @@ internal sealed class RuleState
 
     public bool Matches(int pid)
     {
-        if (_pidMatchCache.TryGetValue(pid, out var cached))
-            return cached;
+        long now = Stopwatch.GetTimestamp();
+        if (_pidMatchCache.TryGetValue(pid, out var cached)
+            && Stopwatch.GetElapsedTime(cached.Timestamp, now) < PidMatchCacheTtl)
+        {
+            return cached.Matches;
+        }
 
         bool result = false;
         try
@@ -484,7 +498,12 @@ internal sealed class RuleState
             result = false;
         }
 
-        _pidMatchCache[pid] = result;
+        if (_pidMatchCache.Count > 4096)
+            _pidMatchCache.Clear();
+
+        _pidMatchCache[pid] = new PidMatchCacheEntry(result, now);
         return result;
     }
+
+    private readonly record struct PidMatchCacheEntry(bool Matches, long Timestamp);
 }

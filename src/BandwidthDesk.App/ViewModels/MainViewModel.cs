@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
@@ -12,6 +13,7 @@ using BandwidthDesk.Core.Throttling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
+using WpfApplication = System.Windows.Application;
 
 namespace BandwidthDesk.App.ViewModels;
 
@@ -20,6 +22,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly AppServices _services;
     private readonly DispatcherTimer _processTimer;
     private readonly Dispatcher _ui;
+    private int _processRefreshVersion;
 
     public ObservableCollection<ProcessGroupViewModel> ProcessGroups { get; } = new();
     public ObservableCollection<RuleRowViewModel> Rules { get; } = new();
@@ -58,7 +61,7 @@ public sealed partial class MainViewModel : ObservableObject
     public MainViewModel(AppServices services)
     {
         _services = services;
-        _ui = Application.Current.Dispatcher;
+        _ui = WpfApplication.Current.Dispatcher;
         IsElevated = App.IsElevated();
         _theme = ThemeManager.Current;
 
@@ -185,10 +188,15 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task RefreshProcessesAsync()
     {
+        var refreshVersion = Interlocked.Increment(ref _processRefreshVersion);
         try
         {
             var procs = await Task.Run(() => _services.ProcessService.GetProcesses(includeSystem: false));
-            await _ui.InvokeAsync(() => RebuildGroups(procs));
+            await _ui.InvokeAsync(() =>
+            {
+                if (refreshVersion == Volatile.Read(ref _processRefreshVersion))
+                    RebuildGroups(procs);
+            });
         }
         catch (Exception ex)
         {
@@ -348,23 +356,23 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void EditRuleForProcess(object? node)
+    private async Task EditRuleForProcess(object? node)
     {
         var rule = FindRuleForProcess(node);
         if (rule is null) return;
         SelectedRule = rule;
-        EditRule();
+        await EditRule();
     }
 
     [RelayCommand]
-    private void NewRuleFromProcessNode(object? node)
+    private async Task NewRuleFromProcessNode(object? node)
     {
         SelectedProcessNode = node;
-        NewRuleFromSelectedProcess();
+        await NewRuleFromSelectedProcess();
     }
 
     [RelayCommand]
-    private void NewRuleFromSelectedProcess()
+    private async Task NewRuleFromSelectedProcess()
     {
         BandwidthRule rule;
         switch (SelectedProcessNode)
@@ -388,13 +396,13 @@ public sealed partial class MainViewModel : ObservableObject
                 };
                 break;
             default:
-                ThemedDialog.Show(Application.Current.MainWindow,
+                ThemedDialog.Show(WpfApplication.Current.MainWindow,
                     "No process selected",
                     "Pick a process from the list on the left first.",
                     ThemedDialogKind.Info, ThemedDialogButtons.Ok);
                 return;
         }
-        OpenEditor(rule, isNew: true);
+        await OpenEditorAsync(rule);
     }
 
     [RelayCommand]
@@ -402,7 +410,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var window = new Views.SettingsWindow(_services)
         {
-            Owner = Application.Current.MainWindow,
+            Owner = WpfApplication.Current.MainWindow,
         };
         window.ShowDialog();
 
@@ -411,10 +419,11 @@ public sealed partial class MainViewModel : ObservableObject
         if (HideMicrosoftProcesses != _settings.HideMicrosoftProcesses)
             HideMicrosoftProcesses = _settings.HideMicrosoftProcesses;
         ApplyRefreshInterval(_settings.ProcessRefreshSeconds);
+        _services.TrayIcon.ApplySettings(_settings);
     }
 
     [RelayCommand]
-    private void NewBlankRule()
+    private async Task NewBlankRule()
     {
         var rule = new BandwidthRule
         {
@@ -422,11 +431,11 @@ public sealed partial class MainViewModel : ObservableObject
             MatchKind = RuleMatchKind.ExecutableName,
             MatchValue = "",
         };
-        OpenEditor(rule, isNew: true);
+        await OpenEditorAsync(rule);
     }
 
     [RelayCommand]
-    private void EditRule()
+    private async Task EditRule()
     {
         if (SelectedRule is null) return;
         var r = SelectedRule.Rule;
@@ -442,46 +451,98 @@ public sealed partial class MainViewModel : ObservableObject
             CreatedUtc = r.CreatedUtc,
             UpdatedUtc = r.UpdatedUtc,
         };
-        OpenEditor(clone, isNew: false);
+        await OpenEditorAsync(clone);
     }
 
     [RelayCommand]
     private async Task DeleteRuleAsync()
     {
         if (SelectedRule is null) return;
-        var result = ThemedDialog.Show(Application.Current.MainWindow,
+        var result = ThemedDialog.Show(WpfApplication.Current.MainWindow,
             $"Delete rule '{SelectedRule.Name}'?",
             "The rule will be removed and no longer applied.",
             ThemedDialogKind.Question, ThemedDialogButtons.YesNo);
         if (result != ThemedDialogResult.Yes) return;
-        await _services.RuleManager.RemoveAsync(SelectedRule.Id);
+        try
+        {
+            await _services.RuleManager.RemoveAsync(SelectedRule.Id);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to delete rule");
+            ThemedDialog.Show(WpfApplication.Current.MainWindow,
+                "Could not delete rule",
+                ex.Message,
+                ThemedDialogKind.Error,
+                ThemedDialogButtons.Ok);
+        }
     }
 
     [RelayCommand]
     private async Task ToggleRuleAsync(RuleRowViewModel? vm)
     {
         if (vm is null) return;
-        await _services.RuleManager.ToggleAsync(vm.Id, vm.Enabled);
+        var requested = vm.Enabled;
+        try
+        {
+            await _services.RuleManager.ToggleAsync(vm.Id, requested);
+        }
+        catch (Exception ex)
+        {
+            vm.Enabled = !requested;
+            Log.Error(ex, "Failed to toggle rule");
+            ThemedDialog.Show(WpfApplication.Current.MainWindow,
+                "Could not update rule",
+                ex.Message,
+                ThemedDialogKind.Error,
+                ThemedDialogButtons.Ok);
+        }
     }
 
     [RelayCommand]
     private async Task ToggleSelectedRuleAsync()
     {
         if (SelectedRule is null) return;
-        SelectedRule.Enabled = !SelectedRule.Enabled;
-        await _services.RuleManager.ToggleAsync(SelectedRule.Id, SelectedRule.Enabled);
+        var requested = !SelectedRule.Enabled;
+        SelectedRule.Enabled = requested;
+        try
+        {
+            await _services.RuleManager.ToggleAsync(SelectedRule.Id, requested);
+        }
+        catch (Exception ex)
+        {
+            SelectedRule.Enabled = !requested;
+            Log.Error(ex, "Failed to toggle selected rule");
+            ThemedDialog.Show(WpfApplication.Current.MainWindow,
+                "Could not update rule",
+                ex.Message,
+                ThemedDialogKind.Error,
+                ThemedDialogButtons.Ok);
+        }
     }
 
-    private void OpenEditor(BandwidthRule rule, bool isNew)
+    private async Task OpenEditorAsync(BandwidthRule rule)
     {
         var existing = _services.RuleManager.Rules.ToList();
         var dialog = new Views.RuleEditorWindow(rule, existing, _settings.DefaultRateUnit)
         {
-            Owner = Application.Current.MainWindow,
+            Owner = WpfApplication.Current.MainWindow,
         };
         if (dialog.ShowDialog() == true)
         {
-            _ = _services.RuleManager.AddOrUpdateAsync(dialog.Result!);
+            try
+            {
+                await _services.RuleManager.AddOrUpdateAsync(dialog.Result!);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Failed to save rule");
+                ThemedDialog.Show(WpfApplication.Current.MainWindow,
+                    "Could not save rule",
+                    ex.Message,
+                    ThemedDialogKind.Error,
+                    ThemedDialogButtons.Ok);
+            }
         }
     }
 

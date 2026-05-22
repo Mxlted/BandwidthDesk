@@ -11,6 +11,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Serilog;
+using WpfApplication = System.Windows.Application;
+using Win32OpenFileDialog = Microsoft.Win32.OpenFileDialog;
+using Win32SaveFileDialog = Microsoft.Win32.SaveFileDialog;
 
 namespace BandwidthDesk.App.ViewModels;
 
@@ -28,9 +31,13 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _hideMicrosoftProcesses;
     [ObservableProperty] private RateUnit _defaultRateUnit;
     [ObservableProperty] private int _processRefreshSeconds;
+    [ObservableProperty] private bool _minimizeToTray;
+    [ObservableProperty] private bool _closeToTray;
+    [ObservableProperty] private bool _showTrayNotifications;
     [ObservableProperty] private string _statusMessage = "";
     [ObservableProperty] private string _profilesDirectory = ProfileStore.Directory;
     [ObservableProperty] private string _dataDirectory = BandwidthDesk.Core.AppPaths.DataDirectory;
+    [ObservableProperty] private string _logsDirectory = BandwidthDesk.Core.AppPaths.LogDirectory;
 
     public bool IsThemeDark
     {
@@ -75,6 +82,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         _hideMicrosoftProcesses = s.HideMicrosoftProcesses;
         _defaultRateUnit = s.DefaultRateUnit;
         _processRefreshSeconds = Math.Clamp(s.ProcessRefreshSeconds, 1, 30);
+        _minimizeToTray = s.MinimizeToTray;
+        _closeToTray = s.CloseToTray;
+        _showTrayNotifications = s.ShowTrayNotifications;
 
         RefreshProfileList();
     }
@@ -121,6 +131,27 @@ public sealed partial class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsUnitMBps));
     }
 
+    partial void OnMinimizeToTrayChanged(bool value)
+    {
+        var s = _getSettings();
+        s.MinimizeToTray = value;
+        _saveSettings(s);
+    }
+
+    partial void OnCloseToTrayChanged(bool value)
+    {
+        var s = _getSettings();
+        s.CloseToTray = value;
+        _saveSettings(s);
+    }
+
+    partial void OnShowTrayNotificationsChanged(bool value)
+    {
+        var s = _getSettings();
+        s.ShowTrayNotifications = value;
+        _saveSettings(s);
+    }
+
     [RelayCommand]
     private async Task SaveCurrentAsProfile()
     {
@@ -134,7 +165,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (Profiles.Contains(name, StringComparer.OrdinalIgnoreCase))
         {
             var ok = ThemedDialog.Show(
-                Application.Current.Windows.OfType<Views.SettingsWindow>().FirstOrDefault(),
+                WpfApplication.Current.Windows.OfType<Views.SettingsWindow>().FirstOrDefault(),
                 "Overwrite profile?",
                 $"A profile named '{name}' already exists. Overwrite it?",
                 ThemedDialogKind.Question, ThemedDialogButtons.YesNo);
@@ -178,7 +209,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
 
         var confirm = ThemedDialog.Show(
-            Application.Current.Windows.OfType<Views.SettingsWindow>().FirstOrDefault(),
+            WpfApplication.Current.Windows.OfType<Views.SettingsWindow>().FirstOrDefault(),
             $"Apply profile '{profile.Name}'?",
             $"This replaces your current rules with {profile.Rules.Count} rule(s) from the profile and switches the theme.",
             ThemedDialogKind.Question, ThemedDialogButtons.OkCancel);
@@ -211,7 +242,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (string.IsNullOrEmpty(SelectedProfile)) return;
 
         var confirm = ThemedDialog.Show(
-            Application.Current.Windows.OfType<Views.SettingsWindow>().FirstOrDefault(),
+            WpfApplication.Current.Windows.OfType<Views.SettingsWindow>().FirstOrDefault(),
             $"Delete profile '{SelectedProfile}'?",
             "This cannot be undone.",
             ThemedDialogKind.Warning, ThemedDialogButtons.YesNo);
@@ -244,7 +275,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             return;
         }
 
-        var dlg = new SaveFileDialog
+        var dlg = new Win32SaveFileDialog
         {
             Title = "Export profile",
             FileName = SelectedProfile + ".bwprofile.json",
@@ -268,7 +299,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private async Task ImportProfile()
     {
-        var dlg = new OpenFileDialog
+        var dlg = new Win32OpenFileDialog
         {
             Title = "Import profile",
             Filter = "BandwidthDesk profile (*.json)|*.json|All files (*.*)|*.*",
@@ -320,6 +351,23 @@ public sealed partial class SettingsViewModel : ObservableObject
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = BandwidthDesk.Core.AppPaths.DataDirectory,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            Status("Could not open folder: " + ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private void OpenLogsFolder()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = BandwidthDesk.Core.AppPaths.LogDirectory,
                 UseShellExecute = true,
             });
         }

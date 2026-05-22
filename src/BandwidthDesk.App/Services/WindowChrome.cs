@@ -2,7 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
-using System.Windows.Media;
+using MediaColor = System.Windows.Media.Color;
 
 namespace BandwidthDesk.App.Services;
 
@@ -52,19 +52,19 @@ public static class WindowChrome
             Apply();
     }
 
-    private static Color LookupColor(AppTheme theme, bool captionForBg) => theme switch
+    private static MediaColor LookupColor(AppTheme theme, bool captionForBg) => theme switch
     {
-        AppTheme.Light => captionForBg ? Color.FromRgb(0xFF, 0xFF, 0xFF) : Color.FromRgb(0xE2, 0xE5, 0xEC),
-        AppTheme.Oled  => Color.FromRgb(0x00, 0x00, 0x00),
-        _              => captionForBg ? Color.FromRgb(0x1E, 0x1E, 0x24) : Color.FromRgb(0x31, 0x31, 0x39),
+        AppTheme.Light => captionForBg ? MediaColor.FromRgb(0xFF, 0xFF, 0xFF) : MediaColor.FromRgb(0xE2, 0xE5, 0xEC),
+        AppTheme.Oled  => MediaColor.FromRgb(0x00, 0x00, 0x00),
+        _              => captionForBg ? MediaColor.FromRgb(0x1E, 0x1E, 0x24) : MediaColor.FromRgb(0x31, 0x31, 0x39),
     };
 
-    private static Color LookupTextColor(AppTheme theme) => theme switch
+    private static MediaColor LookupTextColor(AppTheme theme) => theme switch
     {
-        AppTheme.Light => Color.FromRgb(0x1B, 0x1D, 0x22),
-        _              => Color.FromRgb(0xEC, 0xEC, 0xF1),
+        AppTheme.Light => MediaColor.FromRgb(0x1B, 0x1D, 0x22),
+        _              => MediaColor.FromRgb(0xEC, 0xEC, 0xF1),
     };
 
     /// <summary>DWM caption/border/text attributes take a COLORREF (0x00BBGGRR), not ARGB.</summary>
-    private static int ToBgrInt(Color c) => (c.B << 16) | (c.G << 8) | c.R;
+    private static int ToBgrInt(MediaColor c) => (c.B << 16) | (c.G << 8) | c.R;
 }

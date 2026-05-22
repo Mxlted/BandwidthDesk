@@ -52,7 +52,7 @@ public static class ThemeManager
 
     public static void Apply(AppTheme theme)
     {
-        var app = Application.Current;
+        var app = System.Windows.Application.Current;
         if (app is null) return;
 
         var uri = theme switch

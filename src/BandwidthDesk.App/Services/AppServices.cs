@@ -16,6 +16,7 @@ public sealed class AppServices : IDisposable
     public IThrottlingEngine Engine { get; private set; } = null!;
     public RuleManager RuleManager { get; private set; } = null!;
     public ProfileStore ProfileStore { get; private set; } = null!;
+    public TrayIconService TrayIcon { get; private set; } = null!;
 
     public void Initialize()
     {
@@ -24,10 +25,13 @@ public sealed class AppServices : IDisposable
         Engine = new WinDivertThrottlingEngine();
         RuleManager = new RuleManager(RuleStore, Engine);
         ProfileStore = new ProfileStore();
+        TrayIcon = new TrayIconService();
+        TrayIcon.Initialize();
     }
 
     public void Dispose()
     {
         try { Engine?.Dispose(); } catch { }
+        try { TrayIcon?.Dispose(); } catch { }
     }
 }

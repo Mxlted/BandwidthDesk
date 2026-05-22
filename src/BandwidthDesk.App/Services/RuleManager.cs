@@ -37,46 +37,44 @@ public sealed class RuleManager
     public async Task AddOrUpdateAsync(BandwidthRule rule)
     {
         rule.UpdatedUtc = DateTime.UtcNow;
-        var existing = Rules.FirstOrDefault(r => r.Id == rule.Id);
-        if (existing is null)
-        {
-            Rules.Add(rule);
-        }
+        var snapshot = Rules.Select(CloneRule).ToList();
+        var idx = snapshot.FindIndex(r => r.Id == rule.Id);
+        if (idx < 0)
+            snapshot.Add(CloneRule(rule));
         else
-        {
-            var idx = Rules.IndexOf(existing);
-            Rules[idx] = rule;
-        }
-        await PersistAsync().ConfigureAwait(true);
+            snapshot[idx] = CloneRule(rule);
+
+        await PersistAsync(snapshot).ConfigureAwait(true);
     }
 
     public async Task RemoveAsync(Guid id)
     {
-        var existing = Rules.FirstOrDefault(r => r.Id == id);
-        if (existing is null) return;
-        Rules.Remove(existing);
-        await PersistAsync().ConfigureAwait(true);
+        var snapshot = Rules.Where(r => r.Id != id).Select(CloneRule).ToList();
+        if (snapshot.Count == Rules.Count) return;
+        await PersistAsync(snapshot).ConfigureAwait(true);
     }
 
     public async Task ReplaceAllAsync(IEnumerable<BandwidthRule> rules)
     {
-        Rules.Clear();
-        foreach (var r in rules) Rules.Add(r);
-        await PersistAsync().ConfigureAwait(true);
+        var snapshot = rules.Select(CloneRule).ToList();
+        await PersistAsync(snapshot).ConfigureAwait(true);
     }
 
     public async Task ToggleAsync(Guid id, bool enabled)
     {
-        var existing = Rules.FirstOrDefault(r => r.Id == id);
+        var snapshot = Rules.Select(CloneRule).ToList();
+        var existing = snapshot.FirstOrDefault(r => r.Id == id);
         if (existing is null) return;
         existing.Enabled = enabled;
         existing.UpdatedUtc = DateTime.UtcNow;
-        await PersistAsync().ConfigureAwait(true);
+        await PersistAsync(snapshot).ConfigureAwait(true);
     }
 
-    private async Task PersistAsync()
+    private async Task PersistAsync(IReadOnlyList<BandwidthRule> rules)
     {
-        await _store.SaveAsync(Rules).ConfigureAwait(true);
+        await _store.SaveAsync(rules).ConfigureAwait(true);
+        Rules.Clear();
+        foreach (var r in rules) Rules.Add(CloneRule(r));
         PushToEngine();
     }
 
@@ -85,4 +83,17 @@ public sealed class RuleManager
         try { _engine.UpdateRules(Rules.ToList()); }
         catch (Exception ex) { Log.Warning(ex, "Engine.UpdateRules threw"); }
     }
+
+    private static BandwidthRule CloneRule(BandwidthRule r) => new()
+    {
+        Id = r.Id,
+        Name = r.Name,
+        MatchKind = r.MatchKind,
+        MatchValue = r.MatchValue,
+        DownloadBytesPerSecond = r.DownloadBytesPerSecond,
+        UploadBytesPerSecond = r.UploadBytesPerSecond,
+        Enabled = r.Enabled,
+        CreatedUtc = r.CreatedUtc,
+        UpdatedUtc = r.UpdatedUtc,
+    };
 }
