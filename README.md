@@ -156,7 +156,6 @@ If something's misbehaving, the log file is the first place to check. Every rule
 * **One rule per program wins.** The first matching rule is used. There's no chaining.
 * **Best-effort PID matching.** The process-to-port lookup refreshes about every 750ms, so very short bursts may slip through before a rule catches them.
 * **PID recycling.** Windows reuses process IDs. Match results are cached by PID, so a very long session may occasionally mis-attribute traffic until the rule set changes. Restart the app if that happens.
-* **No installer.** Build and run for now. No MSIX or MSI yet.
 * **Needs admin.** Without elevation the UI is read-only as far as the engine is concerned. Limits aren't enforced.
 
 ---
