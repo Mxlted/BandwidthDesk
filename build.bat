@@ -129,7 +129,7 @@ rem  Helpers
 rem ============================================================================
 
 :read_version
-set "APPVER=0.1.0"
+set "APPVER=0.1.1"
 set "VERFILE=%TEMP%\bandwidthdesk_ver.txt"
 if exist "%VERFILE%" del /f /q "%VERFILE%" >nul 2>nul
 powershell -NoProfile -ExecutionPolicy Bypass -Command "([xml](Get-Content -Raw '%ROOT%\Directory.Build.props')).Project.PropertyGroup.Version | Out-File -Encoding ascii -NoNewline '%VERFILE%'" >nul 2>nul
@@ -173,7 +173,7 @@ echo [build] Publish OK: "%PUBDIR%"
 exit /b 0
 
 :do_portable
-if not defined APPVER set "APPVER=0.1.0"
+if not defined APPVER set "APPVER=0.1.1"
 set "ZIPNAME=BandwidthDesk-%APPVER%-portable-x64.zip"
 set "ZIPPATH=%BUILDROOT%\%ZIPNAME%"
 if exist "%ZIPPATH%" del /F /Q "%ZIPPATH%"
@@ -188,7 +188,7 @@ echo [build] Portable OK: "%ZIPPATH%"
 exit /b 0
 
 :do_installer
-if not defined APPVER set "APPVER=0.1.0"
+if not defined APPVER set "APPVER=0.1.1"
 call :find_iscc
 if not defined ISCC (
   echo.

@@ -6,7 +6,7 @@
 ; All three /D defines are required; defaults below are only for IDE usage.
 
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
+  #define AppVersion "0.1.1"
 #endif
 
 #ifndef SourceDir
