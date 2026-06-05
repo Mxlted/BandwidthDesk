@@ -14,6 +14,8 @@ namespace BandwidthDesk.App.Views;
 
 public partial class RuleEditorWindow : Window
 {
+    private const long MinimumPositiveLimitBytesPerSecond = 1024;
+
     private readonly BandwidthRule _draft;
     private readonly IReadOnlyList<BandwidthRule> _existingRules;
     private readonly RateUnit _defaultUnit;
@@ -128,7 +130,7 @@ public partial class RuleEditorWindow : Window
                 ErrorText.Text = "Match value is required.";
                 return;
             }
-            if (kind == RuleMatchKind.ProcessId && !int.TryParse(value, out _))
+            if (kind == RuleMatchKind.ProcessId && !int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
             {
                 ErrorText.Text = "Process id must be an integer.";
                 return;
@@ -138,7 +140,7 @@ public partial class RuleEditorWindow : Window
             var dup = _existingRules.FirstOrDefault(r =>
                 r.Id != _draft.Id &&
                 r.MatchKind == kind &&
-                string.Equals(r.MatchValue?.Trim(), value, MatchValueComparison(kind)));
+                RuleMatchNormalizer.MatchValuesEqual(kind, r.MatchValue, value));
             if (dup is not null)
             {
                 ErrorText.Text = $"A rule already exists for this {DescribeKind(kind)} ('{dup.Name}'). Edit that rule instead.";
@@ -152,10 +154,16 @@ public partial class RuleEditorWindow : Window
                 ErrorText.Text = "Limits must be non-negative numbers.";
                 return;
             }
+            if ((down > 0 && down < MinimumPositiveLimitBytesPerSecond)
+                || (up > 0 && up < MinimumPositiveLimitBytesPerSecond))
+            {
+                ErrorText.Text = "Positive limits must be at least 1 KB/s. Use 0 to leave a direction unlimited.";
+                return;
+            }
 
             _draft.Name = string.IsNullOrWhiteSpace(NameBox.Text) ? value : NameBox.Text.Trim();
             _draft.MatchKind = kind;
-            _draft.MatchValue = value;
+            _draft.MatchValue = NormalizeForStorage(kind, value);
             _draft.DownloadBytesPerSecond = down;
             _draft.UploadBytesPerSecond = up;
             _draft.Enabled = EnabledBox.IsChecked == true;
@@ -171,11 +179,13 @@ public partial class RuleEditorWindow : Window
         }
     }
 
-    private static StringComparison MatchValueComparison(RuleMatchKind kind) => kind switch
+    private static string NormalizeForStorage(RuleMatchKind kind, string value)
     {
-        RuleMatchKind.ProcessId => StringComparison.Ordinal,
-        _ => StringComparison.OrdinalIgnoreCase,
-    };
+        return kind == RuleMatchKind.ProcessId
+            && int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var pid)
+            ? pid.ToString(CultureInfo.InvariantCulture)
+            : value;
+    }
 
     private static string DescribeKind(RuleMatchKind kind) => kind switch
     {

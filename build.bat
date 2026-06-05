@@ -71,7 +71,12 @@ echo [build] Output: %EXE%
 if not exist "%OUTDIR%\WinDivert.dll" (
   echo.
   echo [build] WARNING: WinDivert.dll is missing from the output directory.
-  echo [build] Place WinDivert.dll and WinDivert64.sys in %NATIVE%\ and rebuild.
+  echo [build] Place WinDivert.dll in %NATIVE%\ and rebuild.
+)
+if not exist "%OUTDIR%\WinDivert64.sys" (
+  echo.
+  echo [build] WARNING: WinDivert64.sys is missing from the output directory.
+  echo [build] Place WinDivert64.sys in %NATIVE%\ and rebuild.
 )
 
 if /I "%ACTION%"=="run" (
@@ -153,7 +158,11 @@ if exist "%NATIVE%\WinDivert64.sys" copy /Y "%NATIVE%\WinDivert64.sys" "%PUBDIR%
 
 if not exist "%PUBDIR%\WinDivert.dll" (
   echo [build] WARNING: WinDivert.dll missing in publish output.
-  echo [build]          Drop WinDivert.dll + WinDivert64.sys in "%NATIVE%\" and re-run.
+  echo [build]          Drop WinDivert.dll in "%NATIVE%\" and re-run.
+)
+if not exist "%PUBDIR%\WinDivert64.sys" (
+  echo [build] WARNING: WinDivert64.sys missing in publish output.
+  echo [build]          Drop WinDivert64.sys in "%NATIVE%\" and re-run.
 )
 
 rem Include LICENSE + README so the portable drop is self-explanatory.

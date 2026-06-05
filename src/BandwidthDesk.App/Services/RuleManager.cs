@@ -18,6 +18,7 @@ public sealed class RuleManager
     private readonly IRuleStore _store;
     private readonly IThrottlingEngine _engine;
     public ObservableCollection<BandwidthRule> Rules { get; } = new();
+    public string? LastLoadWarningMessage { get; private set; }
 
     public RuleManager(IRuleStore store, IThrottlingEngine engine)
     {
@@ -28,6 +29,9 @@ public sealed class RuleManager
     public async Task LoadAsync()
     {
         var loaded = await _store.LoadAsync().ConfigureAwait(true);
+        LastLoadWarningMessage = _store is JsonRuleStore jsonStore
+            ? jsonStore.LastLoadWarningMessage
+            : null;
         Rules.Clear();
         foreach (var r in loaded) Rules.Add(r);
         PushToEngine();

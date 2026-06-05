@@ -161,12 +161,15 @@ public sealed partial class SettingsViewModel : ObservableObject
             return;
         }
 
-        if (Profiles.Contains(name, StringComparer.OrdinalIgnoreCase))
+        var storageKey = ProfileStore.StorageKeyForName(name);
+        var existingProfile = Profiles.FirstOrDefault(profile =>
+            string.Equals(ProfileStore.StorageKeyForName(profile), storageKey, StringComparison.OrdinalIgnoreCase));
+        if (existingProfile is not null)
         {
             var ok = ThemedDialog.Show(
                 WpfApplication.Current.Windows.OfType<Views.SettingsWindow>().FirstOrDefault(),
                 "Overwrite profile?",
-                $"A profile named '{name}' already exists. Overwrite it?",
+                $"A profile named '{existingProfile}' already uses this storage name. Overwrite it?",
                 ThemedDialogKind.Question, ThemedDialogButtons.YesNo);
             if (ok != ThemedDialogResult.Yes) return;
         }

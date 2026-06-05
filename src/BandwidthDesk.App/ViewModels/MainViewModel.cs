@@ -101,6 +101,7 @@ public sealed partial class MainViewModel : ObservableObject
         await _services.RuleManager.LoadAsync();
         SyncRulesFromManager();
         _services.RuleManager.Rules.CollectionChanged += (_, _) => SyncRulesFromManager();
+        ShowStartupPersistenceWarnings();
 
         await RefreshProcessesAsync();
         _processTimer.Start();
@@ -120,6 +121,29 @@ public sealed partial class MainViewModel : ObservableObject
         else
         {
             EngineStatusMessage = "Not elevated — restart as Administrator to apply limits.";
+        }
+    }
+
+    private void ShowStartupPersistenceWarnings()
+    {
+        var owner = WpfApplication.Current.MainWindow;
+        if (!string.IsNullOrWhiteSpace(_services.RuleManager.LastLoadWarningMessage))
+        {
+            ThemedDialog.Show(owner,
+                "Rules file was preserved",
+                _services.RuleManager.LastLoadWarningMessage,
+                ThemedDialogKind.Warning,
+                ThemedDialogButtons.Ok);
+        }
+
+        var settingsWarning = UserSettingsStore.ConsumeLastLoadWarning();
+        if (!string.IsNullOrWhiteSpace(settingsWarning))
+        {
+            ThemedDialog.Show(owner,
+                "Settings file was preserved",
+                settingsWarning,
+                ThemedDialogKind.Warning,
+                ThemedDialogButtons.Ok);
         }
     }
 
@@ -344,11 +368,11 @@ public sealed partial class MainViewModel : ObservableObject
             var r = rule.Rule;
             if (exeName is not null
                 && r.MatchKind == RuleMatchKind.ExecutableName
-                && string.Equals(r.MatchValue, exeName, StringComparison.OrdinalIgnoreCase))
+                && RuleMatchNormalizer.MatchValuesEqual(RuleMatchKind.ExecutableName, r.MatchValue, exeName))
                 return rule;
             if (pid != 0
                 && r.MatchKind == RuleMatchKind.ProcessId
-                && int.TryParse(r.MatchValue, out var rpid)
+                && int.TryParse(RuleMatchNormalizer.NormalizeForComparison(RuleMatchKind.ProcessId, r.MatchValue), out var rpid)
                 && rpid == pid)
                 return rule;
         }

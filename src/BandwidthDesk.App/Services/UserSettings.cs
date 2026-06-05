@@ -55,6 +55,7 @@ public enum RateUnit
 public static class UserSettingsStore
 {
     private static readonly string Path = System.IO.Path.Combine(AppPaths.DataDirectory, "settings.json");
+    private static string? _lastLoadWarningMessage;
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -73,8 +74,19 @@ public static class UserSettingsStore
         catch (Exception ex)
         {
             Log.Warning(ex, "Failed to load user settings; using defaults");
+            var backupPath = PreserveCorruptFile(Path, ex);
+            _lastLoadWarningMessage = backupPath is null
+                ? "BandwidthDesk could not read settings.json and used default settings. The original file could not be moved; check the log before saving settings."
+                : $"BandwidthDesk could not read settings.json and used default settings. The unreadable file was preserved as {backupPath}.";
             return new UserSettings();
         }
+    }
+
+    public static string? ConsumeLastLoadWarning()
+    {
+        var warning = _lastLoadWarningMessage;
+        _lastLoadWarningMessage = null;
+        return warning;
     }
 
     public static void Save(UserSettings settings)
@@ -92,6 +104,32 @@ public static class UserSettingsStore
         catch (Exception ex)
         {
             Log.Warning(ex, "Failed to save user settings");
+        }
+    }
+
+    private static string? PreserveCorruptFile(string path, Exception cause)
+    {
+        try
+        {
+            if (!File.Exists(path))
+                return null;
+
+            var dir = System.IO.Path.GetDirectoryName(path) ?? string.Empty;
+            var name = System.IO.Path.GetFileNameWithoutExtension(path);
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
+            var backupPath = System.IO.Path.Combine(dir, $"{name}.corrupt-{timestamp}.json");
+            int suffix = 2;
+            while (File.Exists(backupPath))
+                backupPath = System.IO.Path.Combine(dir, $"{name}.corrupt-{timestamp}-{suffix++}.json");
+
+            File.Move(path, backupPath);
+            Log.Warning(cause, "Preserved unreadable settings file at {BackupPath}", backupPath);
+            return backupPath;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to preserve unreadable settings file; path={Path}", path);
+            return null;
         }
     }
 }

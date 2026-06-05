@@ -230,6 +230,15 @@ public partial class MainWindow : Window
         }
     }
 
+    private void RuleItem_OnPreviewRightClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is WpfListViewItem item && !item.IsSelected)
+        {
+            item.Focus();
+            item.IsSelected = true;
+        }
+    }
+
     private static T? FindAncestor<T>(DependencyObject? d) where T : DependencyObject
     {
         while (d is not null and not T)

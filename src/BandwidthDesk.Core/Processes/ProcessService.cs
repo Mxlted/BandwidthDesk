@@ -112,11 +112,24 @@ public sealed class ProcessService
 
         if (!string.IsNullOrEmpty(path))
         {
-            var sysRoot = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-            if (!string.IsNullOrEmpty(sysRoot)
-                && path.StartsWith(sysRoot, StringComparison.OrdinalIgnoreCase))
+            try
             {
-                return true;
+                var sysRoot = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                if (!string.IsNullOrEmpty(sysRoot))
+                {
+                    var fullPath = Path.GetFullPath(path);
+                    var fullRoot = Path.GetFullPath(sysRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    if (fullPath.Equals(fullRoot, StringComparison.OrdinalIgnoreCase)
+                        || fullPath.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                        || fullPath.StartsWith(fullRoot + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+                // Invalid or inaccessible paths are treated as non-Microsoft by this heuristic.
             }
         }
 

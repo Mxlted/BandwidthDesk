@@ -18,7 +18,6 @@ namespace BandwidthDesk.Core.Processes;
 public static class ConnectionTable
 {
     private const int AF_INET = 2;
-    private const int AF_INET6 = 23;
 
     private const int TCP_TABLE_OWNER_PID_ALL = 5;
     private const int UDP_TABLE_OWNER_PID = 1;
@@ -52,7 +51,7 @@ public static class ConnectionTable
 
     /// <summary>
     /// Snapshots current TCP+UDP IPv4 connections and returns a (proto, localAddr, localPort) -> pid map.
-    /// IPv6 is intentionally omitted for v0; see TODO in CLAUDE.md.
+    /// IPv6 is intentionally omitted for the current engine.
     /// </summary>
     public static Dictionary<ConnectionKey, int> Snapshot()
     {

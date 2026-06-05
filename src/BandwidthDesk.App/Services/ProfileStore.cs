@@ -105,13 +105,15 @@ public sealed class ProfileStore
         if (profile is null) return null;
 
         // Make sure the imported profile gets a unique name in the local store.
-        var taken = new HashSet<string>(ListProfileNames(), StringComparer.OrdinalIgnoreCase);
+        var taken = new HashSet<string>(
+            ListProfileNames().Select(StorageKeyForName),
+            StringComparer.OrdinalIgnoreCase);
         var baseName = string.IsNullOrWhiteSpace(profile.Name)
             ? Path.GetFileNameWithoutExtension(sourcePath)
             : profile.Name;
         var name = baseName;
         int n = 2;
-        while (taken.Contains(name))
+        while (taken.Contains(StorageKeyForName(name)))
             name = $"{baseName} ({n++})";
         profile.Name = name;
 
@@ -122,6 +124,8 @@ public sealed class ProfileStore
         await SaveAsync(profile).ConfigureAwait(false);
         return profile;
     }
+
+    public static string StorageKeyForName(string name) => SanitizeFileName(name);
 
     private static async Task WriteAsync(string path, Profile profile)
     {

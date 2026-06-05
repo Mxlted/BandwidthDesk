@@ -362,6 +362,7 @@
                               MouseDoubleClick="RulesList_OnMouseDoubleClick">
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem" BasedOn="{StaticResource {x:Type ListViewItem}}">
+                                <EventSetter Event="PreviewMouseRightButtonDown" Handler="RuleItem_OnPreviewRightClick" />
                                 <Setter Property="Tag" Value="{Binding DataContext, ElementName=RootWindow}" />
                                 <Setter Property="ContextMenu">
                                     <Setter.Value>
@@ -442,7 +443,7 @@
         <!-- Footer -->
         <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="2,14,0,0">
             <TextBlock Style="{StaticResource Text.Subtle}"
-                       Text="Rules saved to %LOCALAPPDATA%\BandwidthDesk\rules.json · Logs in logs\" />
+                       Text="Rules saved to %LOCALAPPDATA%\BandwidthDesk\rules.json · Logs in %LOCALAPPDATA%\BandwidthDesk\logs\" />
         </StackPanel>
     </Grid>
 </Window>

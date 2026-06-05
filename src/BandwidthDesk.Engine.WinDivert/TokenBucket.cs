@@ -40,25 +40,26 @@ internal sealed class TokenBucket
     }
 
     /// <summary>
-    /// Tries to consume <paramref name="bytes"/> tokens. If insufficient, returns the milliseconds the caller
-    /// should wait before retrying. Returns 0 on success.
+    /// Reserves tokens for <paramref name="bytes"/> and returns the stopwatch timestamp when the
+    /// packet should be sent. The bucket may go negative to model accumulated pacing debt.
     /// </summary>
-    public int TryConsume(int bytes)
+    public long Reserve(int bytes)
     {
         lock (_gate)
         {
             Refill();
+            long now = Stopwatch.GetTimestamp();
             if (_tokens >= bytes)
             {
                 _tokens -= bytes;
-                return 0;
+                return now;
             }
 
             double needed = bytes - _tokens;
             double seconds = needed / Math.Max(_ratePerSecond, 1);
             _tokens -= bytes;
-            int ms = (int)Math.Ceiling(seconds * 1000);
-            return Math.Max(ms, 1);
+            long delayTicks = (long)Math.Ceiling(seconds * Stopwatch.Frequency);
+            return now + Math.Max(delayTicks, 1);
         }
     }
 

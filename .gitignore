@@ -1,82 +1,59 @@
-# Build output
+# Build and distribution output
 bin/
 obj/
-*.user
-*.suo
-*.userprefs
-*.tlog
-*.binlog
-*.cache
-project.lock.json
-project.assets.json
-*.nuget.props
-*.nuget.targets
-*.pdb
-*.dll.config
-
-# Rider / VS / VSCode
-.idea/
-.vs/
-.vscode/
-*.sln.iml
-.fleet/
-
-# Resharper
-_ReSharper*/
-*.DotSettings.user
-
-# NuGet
+build/
+publish/
+dist/
+*.zip
+*.exe
+*.msi*
+*.appx*
 *.nupkg
 *.snupkg
-.nuget/
-packages/
 
-# Logs (runtime)
+# IDE and user-specific files
+.vs/
+.idea/
+.fleet/
+.vscode/
+*.user*
+*.suo
+*.rsuser
+*.sln.iml
+
+# Logs, local runtime data, and test output
 logs/
 *.log
-
-# Native binaries — fetched separately; not checked in
-native/x64/WinDivert.dll
-native/x64/WinDivert64.sys
-native/**/*.dll
-native/**/*.sys
-!native/x64/.gitkeep
-
-# OS / editor cruft
-Thumbs.db
-ehthumbs.db
-desktop.ini
-$RECYCLE.BIN/
-.DS_Store
-
-# MSIX / publish / distribution output
-publish/
-build/
-dist/
-*.appx
-*.appxbundle
-*.msix
-*.msi
-
-# Coverage / test output
-coverage*/
+*dmp
+*.dump
+rules.json
+settings.json
+profiles/
+*.corrupt-*.json
 TestResults/
+coverage*/
 *.coverage
 *.trx
 
-# Local environment / secrets
-*.env
-.env.*
-*.local.json
-appsettings.Local.json
+# Local secrets and overrides
+.env*
+*.[Ll]ocal.json
 secrets.json
 *.pfx
+*.p12
 *.snk
 
-# Editor backups / swap files
-*~
-*.bak
-*.swp
+# Local WinDivert files
+/native/x64/*
+!/native/x64/.gitkeep
+
+# Temporary and OS files
 *.tmp
+*.bak
 *.orig
 *.rej
+*.sw?
+*~
+Thumbs.db
+desktop.ini
+.DS_Store

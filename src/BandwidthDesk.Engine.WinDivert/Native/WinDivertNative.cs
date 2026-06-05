@@ -118,6 +118,15 @@ internal static class WinDivertNative
 
     [DllImport(Dll, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool WinDivertSend(
+        IntPtr handle,
+        [In] byte[] packet,
+        uint packetLen,
+        out uint sendLen,
+        ref Address address);
+
+    [DllImport(Dll, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool WinDivertShutdown(IntPtr handle, ShutdownHow how);
 
     [DllImport(Dll, SetLastError = true)]

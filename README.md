@@ -10,7 +10,7 @@ A Windows app that caps how fast individual programs can upload and download. Th
 
 * See every running program grouped by name, so all your Chrome windows show up as one row instead of fifteen.
 * Watch live download and upload speeds for each program, updated every second.
-* Add a rule for any program (by name, full path, or a specific running instance) with separate download and upload caps. Set a cap to 0 to leave that direction unlimited.
+* Add a rule for any program (by name, full path, or a specific running instance) with separate download and upload caps. Set a cap to 0 to leave that direction unlimited; positive caps entered in the UI must be at least 1 KB/s.
 * Turn rules on and off with one click. Edit or delete them from a right-click menu or by double-clicking.
 * Sort the process list by name, instance count, memory, or current traffic. Hide Microsoft system processes with one checkbox so the list isn't full of `svchost.exe`.
 * Save the whole rule set as a named **profile**. Switch between profiles in a click (for example, a "Work" profile vs. a "Gaming" profile), or export them to a file and bring them to another PC.
@@ -59,7 +59,7 @@ The script will close any running copy of the app first so files aren't locked.
 
 ### Distribution
 
-* **Portable** (`build.bat portable`) produces a self-contained zip in `build/`. No .NET runtime required on the target machine — just unzip and run `BandwidthDesk.exe` elevated. WinDivert.dll and WinDivert64.sys are bundled inside.
+* **Portable** (`build.bat portable`) produces a self-contained zip in `build/`. No .NET runtime required on the target machine — just unzip and run `BandwidthDesk.exe` elevated. WinDivert.dll and WinDivert64.sys are bundled inside when they were present in `native/x64/` before publishing; the script warns separately if either file is missing.
 * **Installer** (`build.bat installer`) needs [Inno Setup 6](https://jrsoftware.org/isdl.php) installed (the script looks for `iscc.exe` on PATH and in the usual Program Files locations). The script is `installer\BandwidthDesk.iss`. The installer writes to `%ProgramFiles%\BandwidthDesk`, adds Start Menu / optional desktop shortcut, and registers an uninstaller. Per-user data in `%LOCALAPPDATA%\BandwidthDesk` is preserved across reinstalls.
 * Both outputs land in `build/` at the repo root.
 
@@ -98,7 +98,7 @@ If you start it without elevation, the UI still works for editing rules but a ba
 
 1. Find the program in the list on the left. Use the search box, or untick "Hide Microsoft" if you're looking for something system-level. Expand a group to pick a specific instance.
 2. Click **Limit selected**, or right-click and choose **Add bandwidth limit**.
-3. Type a download or upload cap. Leaving a value at 0 means "no limit" for that direction. The match defaults to the program's name, which means the rule will keep working when the program closes and opens again. Switch to PID if you only want to limit one specific run.
+3. Type a download or upload cap. Leaving a value at 0 means "no limit" for that direction. Positive limits must be at least 1 KB/s. The match defaults to the program's name, which means the rule will keep working when the program closes and opens again. Switch to PID if you only want to limit one specific run.
 4. Save. The rule shows up on the right and starts applying right away.
 
 You can also double-click a process to jump straight into the rule editor, or double-click an existing rule to edit it.
@@ -118,7 +118,7 @@ Profiles live at `%LOCALAPPDATA%\BandwidthDesk\profiles\` and are plain JSON, so
 
 ## How it works (the short version)
 
-The app sits between Windows and your network card, looking at every packet going in or out. For each packet it figures out which program owns it, checks if you have a rule for that program, and if so passes the packet through a "token bucket" that paces it to your chosen speed limit. If the bucket is empty the packet waits a few milliseconds. The remote side notices the slowdown and naturally throttles itself.
+The app sits between Windows and your network card, looking at IPv4 TCP/UDP packets going in or out. For each packet it figures out which program owns it, checks if you have a rule for that program, and if so passes the packet through a "token bucket" that paces it to your chosen speed limit. Packets that need pacing are copied into a bounded delayed-send queue and reinjected when due, so unrelated packets can keep moving through the capture loop. The remote side notices the slowdown and naturally throttles itself.
 
 A separate background thread measures real throughput per program once a second, which is what feeds the live numbers in the UI even when no rule is matching.
 
@@ -145,17 +145,20 @@ The trade-off: WinDivert installs a kernel driver (requires admin), and adds a s
 | `%LOCALAPPDATA%\BandwidthDesk\profiles\<name>.json` | Saved profiles |
 | `%LOCALAPPDATA%\BandwidthDesk\logs\bandwidthdesk-YYYY-MM-DD.log` | Daily rolling log files (kept for 7 days) |
 
+If `rules.json` or `settings.json` is unreadable, BandwidthDesk preserves it beside the original as `rules.corrupt-<timestamp>.json` or `settings.corrupt-<timestamp>.json`, starts with safe defaults, and shows a warning.
+
 If something's misbehaving, the log file is the first place to check. Every rule change and every error from the driver gets recorded there.
 
 ---
 
 ## Known limitations
 
-* **IPv4 only for now.** IPv6 packets are seen but can't be tied back to a program yet, so they pass through unshaped.
+* **IPv4 only for now.** The current WinDivert filter captures IPv4 TCP/UDP traffic; IPv6 is excluded and passes through unshaped.
 * **No system / kernel traffic.** Anything owned by PID 0 or 4 (the kernel itself) can't be matched to a rule.
 * **One rule per program wins.** The first matching rule is used. There's no chaining.
 * **Best-effort PID matching.** The process-to-port lookup refreshes about every 750ms, so very short bursts may slip through before a rule catches them.
-* **PID recycling.** Windows reuses process IDs. Match results are cached by PID, so a very long session may occasionally mis-attribute traffic until the rule set changes. Restart the app if that happens.
+* **PID recycling.** Windows reuses process IDs. Match results are cached by PID for about 10 seconds, so restarted processes can be briefly mis-attributed.
+* **Bounded delay queue.** If the delayed-send queue is saturated, BandwidthDesk reinjects the packet immediately instead of dropping it or blocking unrelated traffic.
 * **Needs admin.** Without elevation the UI is read-only as far as the engine is concerned. Limits aren't enforced.
 
 ---

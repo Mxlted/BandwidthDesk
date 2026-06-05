@@ -25,6 +25,8 @@ public sealed class JsonRuleStore : IRuleStore
     private readonly string _path;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
+    public string? LastLoadWarningMessage { get; private set; }
+
     public JsonRuleStore() : this(AppPaths.RulesFilePath) { }
 
     public JsonRuleStore(string path)
@@ -40,16 +42,22 @@ public sealed class JsonRuleStore : IRuleStore
             if (!File.Exists(_path))
             {
                 Log.Information("Rules file not found, starting empty; path={Path}", _path);
+                LastLoadWarningMessage = null;
                 return Array.Empty<BandwidthRule>();
             }
 
             await using var stream = File.OpenRead(_path);
             var rules = await JsonSerializer.DeserializeAsync<List<BandwidthRule?>>(stream, JsonOptions, ct).ConfigureAwait(false);
+            LastLoadWarningMessage = null;
             return NormalizeRules(rules);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to load rules; path={Path}", _path);
+            var backupPath = PreserveCorruptFile(_path, ex);
+            LastLoadWarningMessage = backupPath is null
+                ? "BandwidthDesk could not read rules.json and started with an empty rule list. The original file could not be moved; check the log before saving new rules."
+                : $"BandwidthDesk could not read rules.json and started with an empty rule list. The unreadable file was preserved as {backupPath}.";
             return Array.Empty<BandwidthRule>();
         }
         finally
@@ -103,5 +111,31 @@ public sealed class JsonRuleStore : IRuleStore
         }
 
         return normalized;
+    }
+
+    private static string? PreserveCorruptFile(string path, Exception cause)
+    {
+        try
+        {
+            if (!File.Exists(path))
+                return null;
+
+            var dir = Path.GetDirectoryName(path) ?? string.Empty;
+            var name = Path.GetFileNameWithoutExtension(path);
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
+            var backupPath = Path.Combine(dir, $"{name}.corrupt-{timestamp}.json");
+            int suffix = 2;
+            while (File.Exists(backupPath))
+                backupPath = Path.Combine(dir, $"{name}.corrupt-{timestamp}-{suffix++}.json");
+
+            File.Move(path, backupPath);
+            Log.Warning(cause, "Preserved unreadable rules file at {BackupPath}", backupPath);
+            return backupPath;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to preserve unreadable rules file; path={Path}", path);
+            return null;
+        }
     }
 }
