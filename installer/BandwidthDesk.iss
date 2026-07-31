@@ -6,7 +6,7 @@
 ; All three /D defines are required; defaults below are only for IDE usage.
 
 #ifndef AppVersion
-  #define AppVersion "0.1.1"
+  #define AppVersion "0.3.0"
 #endif
 
 #ifndef SourceDir
@@ -37,6 +37,8 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=
+CloseApplications=force
+RestartApplications=no
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -53,8 +55,13 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-; Application binaries (everything dotnet publish produced)
-Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Application binaries (everything dotnet publish produced except the kernel driver).
+Source: "{#SourceDir}\*"; Excludes: "WinDivert64.sys"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; Do not force an identical loaded kernel driver to be overwritten. If a newer or
+; genuinely different driver is packaged and Windows still has the old image locked,
+; schedule the replacement for reboot instead of showing an access-denied retry dialog.
+Source: "{#SourceDir}\WinDivert64.sys"; DestDir: "{app}"; Flags: replacesameversion restartreplace skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"

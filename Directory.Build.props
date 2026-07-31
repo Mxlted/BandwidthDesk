@@ -8,7 +8,7 @@
     <Authors>BandwidthDesk Contributors</Authors>
     <Company>BandwidthDesk</Company>
     <Product>BandwidthDesk</Product>
-    <Version>0.1.1</Version>
+    <Version>0.3.0</Version>
     <RepositoryUrl>https://github.com/Mxlted/BandwidthDesk</RepositoryUrl>
   </PropertyGroup>
 </Project>

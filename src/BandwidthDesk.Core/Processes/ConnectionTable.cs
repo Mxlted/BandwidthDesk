@@ -18,6 +18,7 @@ namespace BandwidthDesk.Core.Processes;
 public static class ConnectionTable
 {
     private const int AF_INET = 2;
+    private const int AF_INET6 = 23;
 
     private const int TCP_TABLE_OWNER_PID_ALL = 5;
     private const int UDP_TABLE_OWNER_PID = 1;
@@ -47,19 +48,46 @@ public static class ConnectionTable
         public uint owningPid;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MIB_TCP6ROW_OWNER_PID
+    {
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+        public byte[] localAddr;
+        public uint localScopeId;
+        public uint localPort;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+        public byte[] remoteAddr;
+        public uint remoteScopeId;
+        public uint remotePort;
+        public uint state;
+        public uint owningPid;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MIB_UDP6ROW_OWNER_PID
+    {
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+        public byte[] localAddr;
+        public uint localScopeId;
+        public uint localPort;
+        public uint owningPid;
+    }
+
     public readonly record struct ConnectionKey(ProtocolType Protocol, IPAddress LocalAddress, int LocalPort);
 
     /// <summary>
-    /// Snapshots current TCP+UDP IPv4 connections and returns a (proto, localAddr, localPort) -> pid map.
-    /// IPv6 is intentionally omitted for the current engine.
+    /// Snapshots current TCP+UDP IPv4 and IPv6 connections and returns a
+    /// (protocol, local address, local port) -> PID map.
     /// </summary>
     public static Dictionary<ConnectionKey, int> Snapshot()
     {
         var map = new Dictionary<ConnectionKey, int>(256);
         try
         {
-            FillTcp(map);
-            FillUdp(map);
+            FillTcp4(map);
+            FillUdp4(map);
+            FillTcp6(map);
+            FillUdp6(map);
         }
         catch (Exception ex)
         {
@@ -68,7 +96,7 @@ public static class ConnectionTable
         return map;
     }
 
-    private static void FillTcp(Dictionary<ConnectionKey, int> map)
+    private static void FillTcp4(Dictionary<ConnectionKey, int> map)
     {
         int size = 0;
         GetExtendedTcpTable(IntPtr.Zero, ref size, false, AF_INET, TCP_TABLE_OWNER_PID_ALL, 0);
@@ -98,7 +126,7 @@ public static class ConnectionTable
         }
     }
 
-    private static void FillUdp(Dictionary<ConnectionKey, int> map)
+    private static void FillUdp4(Dictionary<ConnectionKey, int> map)
     {
         int size = 0;
         GetExtendedUdpTable(IntPtr.Zero, ref size, false, AF_INET, UDP_TABLE_OWNER_PID, 0);
@@ -116,6 +144,66 @@ public static class ConnectionTable
             for (int i = 0; i < count; i++)
             {
                 var row = Marshal.PtrToStructure<MIB_UDPROW_OWNER_PID>(cursor);
+                var addr = new IPAddress(row.localAddr);
+                var port = NtoHsPort(row.localPort);
+                map[new ConnectionKey(ProtocolType.Udp, addr, port)] = (int)row.owningPid;
+                cursor = IntPtr.Add(cursor, rowSize);
+            }
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buf);
+        }
+    }
+
+    private static void FillTcp6(Dictionary<ConnectionKey, int> map)
+    {
+        int size = 0;
+        GetExtendedTcpTable(IntPtr.Zero, ref size, false, AF_INET6, TCP_TABLE_OWNER_PID_ALL, 0);
+        if (size <= 0) return;
+
+        IntPtr buf = Marshal.AllocHGlobal(size);
+        try
+        {
+            var rc = GetExtendedTcpTable(buf, ref size, false, AF_INET6, TCP_TABLE_OWNER_PID_ALL, 0);
+            if (rc != 0) return;
+
+            int count = Marshal.ReadInt32(buf);
+            int rowSize = Marshal.SizeOf<MIB_TCP6ROW_OWNER_PID>();
+            IntPtr cursor = IntPtr.Add(buf, 4);
+            for (int i = 0; i < count; i++)
+            {
+                var row = Marshal.PtrToStructure<MIB_TCP6ROW_OWNER_PID>(cursor);
+                var addr = new IPAddress(row.localAddr);
+                var port = NtoHsPort(row.localPort);
+                map[new ConnectionKey(ProtocolType.Tcp, addr, port)] = (int)row.owningPid;
+                cursor = IntPtr.Add(cursor, rowSize);
+            }
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buf);
+        }
+    }
+
+    private static void FillUdp6(Dictionary<ConnectionKey, int> map)
+    {
+        int size = 0;
+        GetExtendedUdpTable(IntPtr.Zero, ref size, false, AF_INET6, UDP_TABLE_OWNER_PID, 0);
+        if (size <= 0) return;
+
+        IntPtr buf = Marshal.AllocHGlobal(size);
+        try
+        {
+            var rc = GetExtendedUdpTable(buf, ref size, false, AF_INET6, UDP_TABLE_OWNER_PID, 0);
+            if (rc != 0) return;
+
+            int count = Marshal.ReadInt32(buf);
+            int rowSize = Marshal.SizeOf<MIB_UDP6ROW_OWNER_PID>();
+            IntPtr cursor = IntPtr.Add(buf, 4);
+            for (int i = 0; i < count; i++)
+            {
+                var row = Marshal.PtrToStructure<MIB_UDP6ROW_OWNER_PID>(cursor);
                 var addr = new IPAddress(row.localAddr);
                 var port = NtoHsPort(row.localPort);
                 map[new ConnectionKey(ProtocolType.Udp, addr, port)] = (int)row.owningPid;

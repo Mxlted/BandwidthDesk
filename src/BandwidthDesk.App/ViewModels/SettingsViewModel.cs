@@ -92,6 +92,16 @@ public sealed partial class SettingsViewModel : ObservableObject
     public bool IsRefreshNormal  { get => ProcessRefreshSeconds == 3; set { if (value) ProcessRefreshSeconds = 3; } }
     public bool IsRefreshSlow    { get => ProcessRefreshSeconds == 10; set { if (value) ProcessRefreshSeconds = 10; } }
 
+    partial void OnSelectedProfileChanged(string? value)
+    {
+        ApplyProfileCommand.NotifyCanExecuteChanged();
+        DeleteProfileCommand.NotifyCanExecuteChanged();
+        ExportProfileCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnNewProfileNameChanged(string value) =>
+        SaveCurrentAsProfileCommand.NotifyCanExecuteChanged();
+
     partial void OnProcessRefreshSecondsChanged(int value)
     {
         var s = _getSettings();
@@ -151,7 +161,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         _saveSettings(s);
     }
 
-    [RelayCommand]
+    private bool CanSaveCurrentAsProfile() => !string.IsNullOrWhiteSpace(NewProfileName);
+
+    [RelayCommand(CanExecute = nameof(CanSaveCurrentAsProfile))]
     private async Task SaveCurrentAsProfile()
     {
         var name = (NewProfileName ?? string.Empty).Trim();
@@ -188,7 +200,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             await _services.ProfileStore.SaveAsync(profile);
             NewProfileName = "";
             RefreshProfileList();
-            SelectedProfile = name;
+            SelectedProfile = Profiles.FirstOrDefault(p =>
+                string.Equals(ProfileStore.StorageKeyForName(p), storageKey, StringComparison.OrdinalIgnoreCase));
             Status($"Saved profile '{name}'.");
         }
         catch (Exception ex)
@@ -198,7 +211,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    private bool HasSelectedProfile() => !string.IsNullOrWhiteSpace(SelectedProfile);
+
+    [RelayCommand(CanExecute = nameof(HasSelectedProfile))]
     private async Task ApplyProfile()
     {
         if (string.IsNullOrEmpty(SelectedProfile)) return;
@@ -238,7 +253,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelectedProfile))]
     private void DeleteProfile()
     {
         if (string.IsNullOrEmpty(SelectedProfile)) return;
@@ -265,7 +280,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelectedProfile))]
     private async Task ExportProfile()
     {
         if (string.IsNullOrEmpty(SelectedProfile)) return;
@@ -318,7 +333,9 @@ public sealed partial class SettingsViewModel : ObservableObject
                 return;
             }
             RefreshProfileList();
-            SelectedProfile = profile.Name;
+            var importedKey = ProfileStore.StorageKeyForName(profile.Name);
+            SelectedProfile = Profiles.FirstOrDefault(p =>
+                string.Equals(ProfileStore.StorageKeyForName(p), importedKey, StringComparison.OrdinalIgnoreCase));
             Status($"Imported as '{profile.Name}'. Click Apply to use it.");
         }
         catch (Exception ex)

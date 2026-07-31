@@ -2,35 +2,35 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- Surfaces -->
-    <SolidColorBrush x:Key="Brush.Bg"           Color="#FF16161B" />
-    <SolidColorBrush x:Key="Brush.Surface"      Color="#FF1E1E24" />
-    <SolidColorBrush x:Key="Brush.SurfaceAlt"   Color="#FF26262E" />
-    <SolidColorBrush x:Key="Brush.SurfaceHover" Color="#FF2F2F38" />
-    <SolidColorBrush x:Key="Brush.SurfaceActive" Color="#FF34343F" />
-    <SolidColorBrush x:Key="Brush.Border"       Color="#FF313139" />
-    <SolidColorBrush x:Key="Brush.BorderStrong" Color="#FF3F3F48" />
+    <SolidColorBrush x:Key="Brush.Bg"           Color="#FF0B0F17" />
+    <SolidColorBrush x:Key="Brush.Surface"      Color="#FF111827" />
+    <SolidColorBrush x:Key="Brush.SurfaceAlt"   Color="#FF172033" />
+    <SolidColorBrush x:Key="Brush.SurfaceHover" Color="#FF1E2A40" />
+    <SolidColorBrush x:Key="Brush.SurfaceActive" Color="#FF25324A" />
+    <SolidColorBrush x:Key="Brush.Border"       Color="#FF263247" />
+    <SolidColorBrush x:Key="Brush.BorderStrong" Color="#FF34435E" />
     <SolidColorBrush x:Key="Brush.Divider"      Color="#22FFFFFF" />
 
     <!-- Text -->
-    <SolidColorBrush x:Key="Brush.Text"         Color="#FFECECF1" />
-    <SolidColorBrush x:Key="Brush.TextMuted"    Color="#FFA0A0AA" />
-    <SolidColorBrush x:Key="Brush.TextSubtle"   Color="#FF6F6F7A" />
+    <SolidColorBrush x:Key="Brush.Text"         Color="#FFF4F7FB" />
+    <SolidColorBrush x:Key="Brush.TextMuted"    Color="#FFA4AFC1" />
+    <SolidColorBrush x:Key="Brush.TextSubtle"   Color="#FF6F7C92" />
     <SolidColorBrush x:Key="Brush.TextOnAccent" Color="#FFFFFFFF" />
 
     <!-- Accent -->
-    <SolidColorBrush x:Key="Brush.Accent"       Color="#FF6E8DFF" />
-    <SolidColorBrush x:Key="Brush.AccentHover"  Color="#FF829AFF" />
-    <SolidColorBrush x:Key="Brush.AccentPress"  Color="#FF5577EE" />
-    <SolidColorBrush x:Key="Brush.AccentSoft"   Color="#406E8DFF" />
+    <SolidColorBrush x:Key="Brush.Accent"       Color="#FF5B8CFF" />
+    <SolidColorBrush x:Key="Brush.AccentHover"  Color="#FF74A0FF" />
+    <SolidColorBrush x:Key="Brush.AccentPress"  Color="#FF4776E8" />
+    <SolidColorBrush x:Key="Brush.AccentSoft"   Color="#335B8CFF" />
 
     <!-- Status -->
-    <SolidColorBrush x:Key="Brush.Success"      Color="#FF4ED48A" />
-    <SolidColorBrush x:Key="Brush.Warning"      Color="#FFE3B341" />
-    <SolidColorBrush x:Key="Brush.Danger"       Color="#FFEC6A6A" />
-    <SolidColorBrush x:Key="Brush.DangerSoft"   Color="#33EC6A6A" />
+    <SolidColorBrush x:Key="Brush.Success"      Color="#FF3DDC97" />
+    <SolidColorBrush x:Key="Brush.Warning"      Color="#FFF3B74B" />
+    <SolidColorBrush x:Key="Brush.Danger"       Color="#FFFF6B75" />
+    <SolidColorBrush x:Key="Brush.DangerSoft"   Color="#2EFF6B75" />
 
     <!-- Selection -->
-    <SolidColorBrush x:Key="Brush.Selection"    Color="#406E8DFF" />
+    <SolidColorBrush x:Key="Brush.Selection"    Color="#335B8CFF" />
 
     <!-- Shadow for cards -->
     <Color x:Key="Color.Shadow">#80000000</Color>

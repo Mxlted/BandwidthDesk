@@ -6,7 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using BandwidthDesk.App.Services;
 using BandwidthDesk.App.ViewModels;
-using WpfListViewItem = System.Windows.Controls.ListViewItem;
+using WpfListBoxItem = System.Windows.Controls.ListBoxItem;
 using WpfTreeViewItem = System.Windows.Controls.TreeViewItem;
 
 namespace BandwidthDesk.App.Views;
@@ -63,6 +63,7 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
+        ViewModel.Dispose();
         System.Windows.Application.Current.SessionEnding -= MainWindow_SessionEnding;
         App.Services.TrayIcon.RestoreRequested -= TrayIcon_RestoreRequested;
         App.Services.TrayIcon.ExitRequested -= TrayIcon_ExitRequested;
@@ -188,7 +189,7 @@ public partial class MainWindow : Window
     private void RulesList_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (e.OriginalSource is not DependencyObject src) return;
-        var item = FindAncestor<WpfListViewItem>(src);
+        var item = FindAncestor<WpfListBoxItem>(src);
         if (item is null) return;
         if (ViewModel.EditRuleCommand.CanExecute(null))
             ViewModel.EditRuleCommand.Execute(null);
@@ -232,7 +233,7 @@ public partial class MainWindow : Window
 
     private void RuleItem_OnPreviewRightClick(object sender, MouseButtonEventArgs e)
     {
-        if (sender is WpfListViewItem item && !item.IsSelected)
+        if (sender is WpfListBoxItem item && !item.IsSelected)
         {
             item.Focus();
             item.IsSelected = true;

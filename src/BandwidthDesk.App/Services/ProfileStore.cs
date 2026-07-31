@@ -159,17 +159,39 @@ public sealed class ProfileStore
         if (profile is null) return null;
 
         profile.SchemaVersion ??= "1";
+        if (!string.Equals(profile.SchemaVersion, "1", StringComparison.Ordinal))
+            return null;
+        if (!Enum.IsDefined(profile.Theme))
+            return null;
         profile.Name ??= string.Empty;
 
         var rules = new List<BandwidthRule>();
+        var matches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (profile.Rules is not null)
         {
             foreach (var rule in profile.Rules)
             {
                 if (rule is null) continue;
+                if (!Enum.IsDefined(rule.MatchKind)
+                    || string.IsNullOrWhiteSpace(rule.MatchValue)
+                    || rule.DownloadBytesPerSecond < 0
+                    || rule.UploadBytesPerSecond < 0)
+                {
+                    return null;
+                }
+
                 if (rule.Id == Guid.Empty) rule.Id = Guid.NewGuid();
                 rule.Name ??= string.Empty;
-                rule.MatchValue ??= string.Empty;
+                rule.MatchValue = rule.MatchValue.Trim();
+                if (rule.MatchKind == RuleMatchKind.ProcessId
+                    && (!int.TryParse(rule.MatchValue, out var pid) || pid <= 0))
+                {
+                    return null;
+                }
+
+                var matchKey = $"{rule.MatchKind}:{RuleMatchNormalizer.NormalizeForComparison(rule.MatchKind, rule.MatchValue)}";
+                if (!matches.Add(matchKey))
+                    return null;
                 rules.Add(rule);
             }
         }
@@ -182,7 +204,20 @@ public sealed class ProfileStore
     {
         var invalid = Path.GetInvalidFileNameChars();
         var chars = name.Select(c => invalid.Contains(c) ? '_' : c).ToArray();
-        var cleaned = new string(chars).Trim();
-        return string.IsNullOrWhiteSpace(cleaned) ? "profile" : cleaned;
+        var cleaned = new string(chars).Trim().TrimEnd('.');
+        if (string.IsNullOrWhiteSpace(cleaned)) cleaned = "profile";
+        if (cleaned.Length > 80) cleaned = cleaned[..80].TrimEnd();
+
+        var stem = cleaned.Split('.')[0];
+        string[] reserved =
+        {
+            "CON", "PRN", "AUX", "NUL",
+            "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        };
+        if (reserved.Contains(stem, StringComparer.OrdinalIgnoreCase))
+            cleaned = "_" + cleaned;
+
+        return cleaned;
     }
 }

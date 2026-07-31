@@ -41,6 +41,9 @@ public partial class RuleEditorWindow : Window
         _draft = draft;
         _existingRules = existingRules;
         _defaultUnit = defaultUnit;
+        HeaderText.Text = existingRules.Any(r => r.Id == draft.Id)
+            ? "Edit bandwidth rule"
+            : "Create a bandwidth rule";
 
         NameBox.Text = draft.Name;
         EnabledBox.IsChecked = draft.Enabled;
@@ -130,9 +133,10 @@ public partial class RuleEditorWindow : Window
                 ErrorText.Text = "Match value is required.";
                 return;
             }
-            if (kind == RuleMatchKind.ProcessId && !int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+            if (kind == RuleMatchKind.ProcessId
+                && (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var pid) || pid <= 0))
             {
-                ErrorText.Text = "Process id must be an integer.";
+                ErrorText.Text = "Process id must be a positive integer.";
                 return;
             }
 

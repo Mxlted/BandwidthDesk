@@ -129,7 +129,7 @@ rem  Helpers
 rem ============================================================================
 
 :read_version
-set "APPVER=0.1.1"
+set "APPVER=0.3.0"
 set "VERFILE=%TEMP%\bandwidthdesk_ver.txt"
 if exist "%VERFILE%" del /f /q "%VERFILE%" >nul 2>nul
 powershell -NoProfile -ExecutionPolicy Bypass -Command "([xml](Get-Content -Raw '%ROOT%\Directory.Build.props')).Project.PropertyGroup.Version | Out-File -Encoding ascii -NoNewline '%VERFILE%'" >nul 2>nul
@@ -173,7 +173,7 @@ echo [build] Publish OK: "%PUBDIR%"
 exit /b 0
 
 :do_portable
-if not defined APPVER set "APPVER=0.1.1"
+if not defined APPVER set "APPVER=0.3.0"
 set "ZIPNAME=BandwidthDesk-%APPVER%-portable-x64.zip"
 set "ZIPPATH=%BUILDROOT%\%ZIPNAME%"
 if exist "%ZIPPATH%" del /F /Q "%ZIPPATH%"
@@ -188,7 +188,7 @@ echo [build] Portable OK: "%ZIPPATH%"
 exit /b 0
 
 :do_installer
-if not defined APPVER set "APPVER=0.1.1"
+if not defined APPVER set "APPVER=0.3.0"
 call :find_iscc
 if not defined ISCC (
   echo.
@@ -224,14 +224,14 @@ exit /b 0
 echo.
 echo [build] FAILED.
 echo [build] Window closes in 5s...
-timeout /t 5 /nobreak >nul
+timeout /t 5 /nobreak >nul 2>nul
 exit /b 1
 
 :done
 echo.
 echo [build] Done.
 echo [build] Window closes in 5s...
-timeout /t 5 /nobreak >nul
+timeout /t 5 /nobreak >nul 2>nul
 exit /b 0
 
 :clean
@@ -243,5 +243,5 @@ for /d /r "%ROOT%\src" %%d in (bin obj) do (
 if exist "%BUILDROOT%" rd /s /q "%BUILDROOT%"
 echo [build] Clean complete.
 echo [build] Window closes in 5s...
-timeout /t 5 /nobreak >nul
+timeout /t 5 /nobreak >nul 2>nul
 exit /b 0

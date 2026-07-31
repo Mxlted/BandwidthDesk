@@ -3,30 +3,30 @@
 
     <!-- True-black palette for OLED panels. Surfaces gain a hint of lift via faint greys. -->
     <SolidColorBrush x:Key="Brush.Bg"           Color="#FF000000" />
-    <SolidColorBrush x:Key="Brush.Surface"      Color="#FF050505" />
-    <SolidColorBrush x:Key="Brush.SurfaceAlt"   Color="#FF0B0B0D" />
-    <SolidColorBrush x:Key="Brush.SurfaceHover" Color="#FF141418" />
-    <SolidColorBrush x:Key="Brush.SurfaceActive" Color="#FF1C1C22" />
-    <SolidColorBrush x:Key="Brush.Border"       Color="#FF1A1A1F" />
-    <SolidColorBrush x:Key="Brush.BorderStrong" Color="#FF2A2A30" />
+    <SolidColorBrush x:Key="Brush.Surface"      Color="#FF05080D" />
+    <SolidColorBrush x:Key="Brush.SurfaceAlt"   Color="#FF0A101A" />
+    <SolidColorBrush x:Key="Brush.SurfaceHover" Color="#FF111B2A" />
+    <SolidColorBrush x:Key="Brush.SurfaceActive" Color="#FF182438" />
+    <SolidColorBrush x:Key="Brush.Border"       Color="#FF172235" />
+    <SolidColorBrush x:Key="Brush.BorderStrong" Color="#FF283750" />
     <SolidColorBrush x:Key="Brush.Divider"      Color="#22FFFFFF" />
 
     <SolidColorBrush x:Key="Brush.Text"         Color="#FFFFFFFF" />
-    <SolidColorBrush x:Key="Brush.TextMuted"    Color="#FF9A9AA4" />
-    <SolidColorBrush x:Key="Brush.TextSubtle"   Color="#FF60606A" />
+    <SolidColorBrush x:Key="Brush.TextMuted"    Color="#FFA2ADBF" />
+    <SolidColorBrush x:Key="Brush.TextSubtle"   Color="#FF65738A" />
     <SolidColorBrush x:Key="Brush.TextOnAccent" Color="#FFFFFFFF" />
 
-    <SolidColorBrush x:Key="Brush.Accent"       Color="#FF7AA2FF" />
-    <SolidColorBrush x:Key="Brush.AccentHover"  Color="#FF94B5FF" />
-    <SolidColorBrush x:Key="Brush.AccentPress"  Color="#FF5F8AF0" />
-    <SolidColorBrush x:Key="Brush.AccentSoft"   Color="#407AA2FF" />
+    <SolidColorBrush x:Key="Brush.Accent"       Color="#FF6697FF" />
+    <SolidColorBrush x:Key="Brush.AccentHover"  Color="#FF80A9FF" />
+    <SolidColorBrush x:Key="Brush.AccentPress"  Color="#FF4E7DE5" />
+    <SolidColorBrush x:Key="Brush.AccentSoft"   Color="#336697FF" />
 
     <SolidColorBrush x:Key="Brush.Success"      Color="#FF55D690" />
     <SolidColorBrush x:Key="Brush.Warning"      Color="#FFEAC04A" />
     <SolidColorBrush x:Key="Brush.Danger"       Color="#FFF06A6A" />
     <SolidColorBrush x:Key="Brush.DangerSoft"   Color="#33F06A6A" />
 
-    <SolidColorBrush x:Key="Brush.Selection"    Color="#407AA2FF" />
+    <SolidColorBrush x:Key="Brush.Selection"    Color="#336697FF" />
 
     <Color x:Key="Color.Shadow">#A0000000</Color>
 </ResourceDictionary>

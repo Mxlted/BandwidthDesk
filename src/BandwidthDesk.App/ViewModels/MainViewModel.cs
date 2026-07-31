@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
@@ -17,12 +16,15 @@ using WpfApplication = System.Windows.Application;
 
 namespace BandwidthDesk.App.ViewModels;
 
-public sealed partial class MainViewModel : ObservableObject
+public sealed partial class MainViewModel : ObservableObject, IDisposable
 {
     private readonly AppServices _services;
     private readonly DispatcherTimer _processTimer;
     private readonly Dispatcher _ui;
-    private int _processRefreshVersion;
+    private readonly EventHandler<AppTheme> _themeChangedHandler;
+    private bool _processRefreshPending;
+    private bool _initialized;
+    private bool _disposed;
 
     public ObservableCollection<ProcessGroupViewModel> ProcessGroups { get; } = new();
     public ObservableCollection<RuleRowViewModel> Rules { get; } = new();
@@ -39,6 +41,12 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _hideMicrosoftProcesses = true;
     [ObservableProperty] private ProcessSortKey _sortKey = ProcessSortKey.Name;
     [ObservableProperty] private bool _sortDescending;
+    [ObservableProperty] private bool _isRefreshingProcesses;
+    [ObservableProperty] private int _visibleApplicationCount;
+    [ObservableProperty] private int _visibleProcessCount;
+    [ObservableProperty] private int _savedRuleCount;
+    [ObservableProperty] private int _activeRuleCount;
+    [ObservableProperty] private string _lastRefreshMessage = "Waiting for first scan";
 
     public bool IsThemeDark
     {
@@ -74,7 +82,7 @@ public sealed partial class MainViewModel : ObservableObject
         _services.Engine.Throughput += OnThroughput;
         _services.Engine.ProcessThroughput += OnProcessThroughput;
 
-        ThemeManager.Changed += (_, t) => _ui.Invoke(() =>
+        _themeChangedHandler = (_, t) => _ui.Invoke(() =>
         {
             Theme = t;
             OnPropertyChanged(nameof(IsThemeDark));
@@ -82,6 +90,7 @@ public sealed partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(IsThemeOled));
             RefreshThemeBindings();
         });
+        ThemeManager.Changed += _themeChangedHandler;
 
         _processTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(ClampRefreshSeconds(_settings.ProcessRefreshSeconds)) };
         _processTimer.Tick += (_, _) => _ = RefreshProcessesAsync();
@@ -98,13 +107,13 @@ public sealed partial class MainViewModel : ObservableObject
 
     public async Task InitializeAsync()
     {
+        if (_initialized) return;
+        _initialized = true;
+
         await _services.RuleManager.LoadAsync();
         SyncRulesFromManager();
-        _services.RuleManager.Rules.CollectionChanged += (_, _) => SyncRulesFromManager();
+        _services.RuleManager.RulesChanged += RuleManagerOnRulesChanged;
         ShowStartupPersistenceWarnings();
-
-        await RefreshProcessesAsync();
-        _processTimer.Start();
 
         if (IsElevated)
         {
@@ -122,7 +131,12 @@ public sealed partial class MainViewModel : ObservableObject
         {
             EngineStatusMessage = "Not elevated — restart as Administrator to apply limits.";
         }
+
+        await RefreshProcessesAsync();
+        _processTimer.Start();
     }
+
+    private void RuleManagerOnRulesChanged(object? sender, EventArgs e) => SyncRulesFromManager();
 
     private void ShowStartupPersistenceWarnings()
     {
@@ -178,6 +192,19 @@ public sealed partial class MainViewModel : ObservableObject
         _ = RefreshProcessesAsync();
     }
 
+    partial void OnSelectedProcessNodeChanged(object? value) =>
+        NewRuleFromSelectedProcessCommand.NotifyCanExecuteChanged();
+
+    partial void OnSelectedRuleChanged(RuleRowViewModel? value)
+    {
+        EditRuleCommand.NotifyCanExecuteChanged();
+        DeleteRuleCommand.NotifyCanExecuteChanged();
+        ToggleSelectedRuleCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsRefreshingProcessesChanged(bool value) =>
+        RefreshProcessesCommand.NotifyCanExecuteChanged();
+
     partial void OnSortKeyChanged(ProcessSortKey value)
     {
         _settings.ProcessSort = value;
@@ -209,22 +236,37 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    private bool CanRefreshProcesses() => !IsRefreshingProcesses;
+
+    [RelayCommand(CanExecute = nameof(CanRefreshProcesses))]
     private async Task RefreshProcessesAsync()
     {
-        var refreshVersion = Interlocked.Increment(ref _processRefreshVersion);
+        if (IsRefreshingProcesses)
+        {
+            _processRefreshPending = true;
+            return;
+        }
+
+        IsRefreshingProcesses = true;
         try
         {
-            var procs = await Task.Run(() => _services.ProcessService.GetProcesses(includeSystem: false));
-            await _ui.InvokeAsync(() =>
+            do
             {
-                if (refreshVersion == Volatile.Read(ref _processRefreshVersion))
-                    RebuildGroups(procs);
-            });
+                _processRefreshPending = false;
+                var procs = await Task.Run(() => _services.ProcessService.GetProcesses(includeSystem: false));
+                RebuildGroups(procs);
+                LastRefreshMessage = $"Updated {DateTime.Now:h:mm:ss tt}";
+            }
+            while (_processRefreshPending && !_disposed);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Process refresh failed");
+            LastRefreshMessage = "Process scan failed — check logs";
+        }
+        finally
+        {
+            IsRefreshingProcesses = false;
         }
     }
 
@@ -309,6 +351,8 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         ApplySortInPlace();
+        VisibleApplicationCount = ProcessGroups.Count;
+        VisibleProcessCount = ProcessGroups.Sum(g => g.InstanceCount);
     }
 
     private IEnumerable<ProcessGroupViewModel> SortGroups(IEnumerable<ProcessGroupViewModel> groups)
@@ -349,8 +393,8 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnProcessFilterChanged(string value) => _ = RefreshProcessesAsync();
 
     /// <summary>
-    /// Returns the first existing rule (if any) that matches the given process node,
-    /// by exe-name first then PID.
+    /// Returns the first existing rule (if any) that matches the given process node.
+    /// Collection order is preserved because the engine also uses first-match-wins semantics.
     /// </summary>
     public RuleRowViewModel? FindRuleForProcess(object? node)
     {
@@ -361,7 +405,13 @@ public sealed partial class MainViewModel : ObservableObject
             _ => null,
         };
         int pid = node is ProcessRowViewModel pr ? pr.ProcessId : 0;
-        if (exeName is null && pid == 0) return null;
+        string? executablePath = node switch
+        {
+            ProcessGroupViewModel g when g.ExecutablePath != "—" => g.ExecutablePath,
+            ProcessRowViewModel r when r.ExecutablePath != "—" => r.ExecutablePath,
+            _ => null,
+        };
+        if (exeName is null && pid == 0 && executablePath is null) return null;
 
         foreach (var rule in Rules)
         {
@@ -374,6 +424,10 @@ public sealed partial class MainViewModel : ObservableObject
                 && r.MatchKind == RuleMatchKind.ProcessId
                 && int.TryParse(RuleMatchNormalizer.NormalizeForComparison(RuleMatchKind.ProcessId, r.MatchValue), out var rpid)
                 && rpid == pid)
+                return rule;
+            if (executablePath is not null
+                && r.MatchKind == RuleMatchKind.ExecutablePath
+                && RuleMatchNormalizer.MatchValuesEqual(RuleMatchKind.ExecutablePath, r.MatchValue, executablePath))
                 return rule;
         }
         return null;
@@ -389,13 +443,24 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task EditRuleForRow(RuleRowViewModel? row)
+    {
+        if (row is null) return;
+        SelectedRule = row;
+        await EditRule();
+    }
+
+    [RelayCommand]
     private async Task NewRuleFromProcessNode(object? node)
     {
         SelectedProcessNode = node;
         await NewRuleFromSelectedProcess();
     }
 
-    [RelayCommand]
+    private bool CanCreateRuleFromSelectedProcess() =>
+        SelectedProcessNode is ProcessRowViewModel or ProcessGroupViewModel;
+
+    [RelayCommand(CanExecute = nameof(CanCreateRuleFromSelectedProcess))]
     private async Task NewRuleFromSelectedProcess()
     {
         BandwidthRule rule;
@@ -419,12 +484,7 @@ public sealed partial class MainViewModel : ObservableObject
                     MatchValue = group.Name,
                 };
                 break;
-            default:
-                ThemedDialog.Show(WpfApplication.Current.MainWindow,
-                    "No process selected",
-                    "Pick a process from the list on the left first.",
-                    ThemedDialogKind.Info, ThemedDialogButtons.Ok);
-                return;
+            default: return;
         }
         await OpenEditorAsync(rule);
     }
@@ -458,7 +518,9 @@ public sealed partial class MainViewModel : ObservableObject
         await OpenEditorAsync(rule);
     }
 
-    [RelayCommand]
+    private bool CanEditRule() => SelectedRule is not null;
+
+    [RelayCommand(CanExecute = nameof(CanEditRule))]
     private async Task EditRule()
     {
         if (SelectedRule is null) return;
@@ -478,7 +540,9 @@ public sealed partial class MainViewModel : ObservableObject
         await OpenEditorAsync(clone);
     }
 
-    [RelayCommand]
+    private bool CanDeleteRule() => SelectedRule is not null;
+
+    [RelayCommand(CanExecute = nameof(CanDeleteRule))]
     private async Task DeleteRuleAsync()
     {
         if (SelectedRule is null) return;
@@ -523,7 +587,9 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    private bool CanToggleSelectedRule() => SelectedRule is not null;
+
+    [RelayCommand(CanExecute = nameof(CanToggleSelectedRule))]
     private async Task ToggleSelectedRuleAsync()
     {
         if (SelectedRule is null) return;
@@ -574,9 +640,35 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _ui.Invoke(() =>
         {
-            Rules.Clear();
-            foreach (var r in _services.RuleManager.Rules)
-                Rules.Add(new RuleRowViewModel(r));
+            var selectedId = SelectedRule?.Id;
+            var incoming = _services.RuleManager.Rules.ToList();
+            var existing = Rules.ToDictionary(r => r.Id);
+            var incomingIds = incoming.Select(r => r.Id).ToHashSet();
+
+            for (int i = Rules.Count - 1; i >= 0; i--)
+            {
+                if (!incomingIds.Contains(Rules[i].Id))
+                    Rules.RemoveAt(i);
+            }
+
+            for (int target = 0; target < incoming.Count; target++)
+            {
+                var rule = incoming[target];
+                if (existing.TryGetValue(rule.Id, out var row) && Rules.Contains(row))
+                {
+                    row.UpdateRule(rule);
+                    var current = Rules.IndexOf(row);
+                    if (current != target) Rules.Move(current, target);
+                }
+                else
+                {
+                    Rules.Insert(target, new RuleRowViewModel(rule));
+                }
+            }
+
+            SavedRuleCount = Rules.Count;
+            ActiveRuleCount = Rules.Count(r => r.IsActivelyLimited);
+            SelectedRule = selectedId is Guid id ? Rules.FirstOrDefault(r => r.Id == id) : null;
         });
     }
 
@@ -585,8 +677,38 @@ public sealed partial class MainViewModel : ObservableObject
         _ui.Invoke(() =>
         {
             EngineStatus = e.Status;
-            EngineStatusMessage = e.Message ?? e.Status.ToString();
+            EngineStatusMessage = e.Message ?? DescribeEngineStatus(e.Status);
+            if (e.Status is not EngineStatus.Running and not EngineStatus.Starting)
+                ResetLiveActivity();
         });
+    }
+
+    private static string DescribeEngineStatus(EngineStatus status) => status switch
+    {
+        EngineStatus.Running => "Traffic shaping active",
+        EngineStatus.Starting => "Starting packet engine",
+        EngineStatus.Faulted => "Traffic shaping unavailable",
+        _ => "Traffic shaping stopped",
+    };
+
+    private void ResetLiveActivity()
+    {
+        TotalDownloadBps = 0;
+        TotalUploadBps = 0;
+        foreach (var group in ProcessGroups)
+        {
+            foreach (var child in group.Children)
+            {
+                child.CurrentDownloadBps = 0;
+                child.CurrentUploadBps = 0;
+            }
+            group.RecalcThroughput();
+        }
+        foreach (var rule in Rules)
+        {
+            rule.CurrentDownloadBps = 0;
+            rule.CurrentUploadBps = 0;
+        }
     }
 
     private void OnThroughput(object? sender, EngineThroughputEventArgs e)
@@ -632,5 +754,17 @@ public sealed partial class MainViewModel : ObservableObject
             TotalDownloadBps = totalD;
             TotalUploadBps = totalU;
         });
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _processTimer.Stop();
+        _services.Engine.StatusChanged -= OnEngineStatusChanged;
+        _services.Engine.Throughput -= OnThroughput;
+        _services.Engine.ProcessThroughput -= OnProcessThroughput;
+        _services.RuleManager.RulesChanged -= RuleManagerOnRulesChanged;
+        ThemeManager.Changed -= _themeChangedHandler;
     }
 }

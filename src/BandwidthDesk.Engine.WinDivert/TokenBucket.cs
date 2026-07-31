@@ -64,6 +64,19 @@ internal sealed class TokenBucket
     }
 
     /// <summary>
+    /// Cancels a reservation when a packet is intentionally dropped before reinjection.
+    /// This prevents a dropped packet from leaving pacing debt behind for later traffic.
+    /// </summary>
+    public void Refund(int bytes)
+    {
+        lock (_gate)
+        {
+            Refill();
+            _tokens = Math.Min(_capacity, _tokens + bytes);
+        }
+    }
+
+    /// <summary>
     /// Consume without throttling (used when no rate limit applies); still drains for telemetry.
     /// </summary>
     public void ForceConsume(int bytes)

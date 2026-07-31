@@ -18,7 +18,7 @@ namespace BandwidthDesk.Engine.WinDivert;
 /// WinDivert-backed per-process bandwidth throttler.
 ///
 /// Strategy:
-///   1. Open a WinDivert handle at the Network layer filtering "ip and (tcp or udp)".
+///   1. Open a WinDivert handle at the Network layer for IPv4/IPv6 TCP and UDP traffic.
 ///   2. Worker thread: WinDivertRecv → parse headers → look up local port owner via IP Helper API
 ///      → find matching rule → reserve tokens from that rule's directional bucket.
 ///   3. If the packet is due now, reinject immediately. If it needs pacing, copy packet/address
@@ -31,7 +31,8 @@ namespace BandwidthDesk.Engine.WinDivert;
 public sealed class WinDivertThrottlingEngine : IThrottlingEngine
 {
     private const int PacketBufferSize = 0xFFFF;
-    private const string CaptureFilter = "ip and (tcp or udp)";
+    private const string CaptureFilter = "(ip or ipv6) and (tcp or udp)";
+    private const int ConnectionSnapshotIntervalMilliseconds = 250;
     private const int MaxDelayedPackets = 8192;
     private const long MaxDelayedBytes = 32L * 1024 * 1024;
 
@@ -212,11 +213,11 @@ public sealed class WinDivertThrottlingEngine : IThrottlingEngine
 
     private void SafeClose()
     {
-        if (_handle != WinDivertNative.InvalidHandle)
+        var handle = Interlocked.Exchange(ref _handle, WinDivertNative.InvalidHandle);
+        if (handle != WinDivertNative.InvalidHandle)
         {
-            try { WinDivertNative.WinDivertClose(_handle); }
+            try { WinDivertNative.WinDivertClose(handle); }
             catch (Exception ex) { Log.Warning(ex, "WinDivertClose threw"); }
-            _handle = WinDivertNative.InvalidHandle;
         }
     }
 
@@ -231,7 +232,7 @@ public sealed class WinDivertThrottlingEngine : IThrottlingEngine
 
     private void SetStatus(EngineStatus s, string? msg)
     {
-        _status = s;
+        lock (_gate) _status = s;
         try { StatusChanged?.Invoke(this, new EngineStatusChangedEventArgs(s, msg)); }
         catch (Exception ex) { Log.Warning(ex, "StatusChanged handler threw"); }
     }
@@ -245,7 +246,7 @@ public sealed class WinDivertThrottlingEngine : IThrottlingEngine
             {
                 var snap = ConnectionTable.Snapshot();
                 Volatile.Write(ref _connSnapshot, snap);
-                ct.WaitHandle.WaitOne(750);
+                ct.WaitHandle.WaitOne(ConnectionSnapshotIntervalMilliseconds);
             }
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
@@ -300,22 +301,36 @@ public sealed class WinDivertThrottlingEngine : IThrottlingEngine
                 Marshal.Copy(buffer, managedBuf, 0, len);
                 var parsed = PacketHeaders.Parse(managedBuf.AsSpan(0, len));
 
-                long dueTicks = Stopwatch.GetTimestamp();
+                long nowTicks = Stopwatch.GetTimestamp();
+                var schedule = PacketSchedule.Untracked(nowTicks);
                 if (parsed.IsValid)
                 {
-                    dueTicks = ApplyRules(parsed, addr.Outbound, dueTicks);
+                    schedule = ApplyRules(parsed, addr.Outbound, nowTicks);
                 }
 
-                if (dueTicks > Stopwatch.GetTimestamp()
-                    && TryEnqueueDelayedPacket(buffer, readLen, addr, dueTicks))
+                if (schedule.DueTicks > Stopwatch.GetTimestamp())
                 {
-                    continue;
+                    var enqueueResult = TryEnqueueDelayedPacket(buffer, readLen, addr, schedule);
+                    if (enqueueResult == DelayedEnqueueResult.Enqueued)
+                        continue;
+
+                    if (enqueueResult == DelayedEnqueueResult.QueueFull)
+                    {
+                        // Do not silently bypass a configured limit. TCP will retransmit and
+                        // reduce its send window; UDP is policed by dropping excess datagrams.
+                        schedule.ReservationBucket?.Refund(schedule.Bytes);
+                        continue;
+                    }
                 }
 
                 if (!WinDivertNative.WinDivertSend(_handle, buffer, readLen, out _, ref addr))
                 {
                     int err = Marshal.GetLastWin32Error();
                     Log.Debug("WinDivertSend failed; err={Err} len={Len}", err, readLen);
+                }
+                else
+                {
+                    RecordSuccessfulPacket(schedule);
                 }
 
                 if (ct.IsCancellationRequested)
@@ -325,6 +340,10 @@ public sealed class WinDivertThrottlingEngine : IThrottlingEngine
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             Log.Error(ex, "WinDivert worker crashed");
+            Volatile.Write(ref _acceptDelayedPackets, false);
+            _cts?.Cancel();
+            RequestDelayedSenderStop(forceDrain: false);
+            SafeClose();
             SetStatus(EngineStatus.Faulted, ex.Message);
         }
         finally
@@ -358,20 +377,25 @@ public sealed class WinDivertThrottlingEngine : IThrottlingEngine
         }
     }
 
-    private bool TryEnqueueDelayedPacket(IntPtr packet, uint packetLen, WinDivertNative.Address address, long dueTicks)
+    private DelayedEnqueueResult TryEnqueueDelayedPacket(
+        IntPtr packet,
+        uint packetLen,
+        WinDivertNative.Address address,
+        PacketSchedule schedule)
     {
         if (!Volatile.Read(ref _acceptDelayedPackets))
-            return false;
+            return DelayedEnqueueResult.Stopping;
 
         lock (_delayGate)
         {
-            if (!_acceptDelayedPackets
-                || _delayerStopRequested
-                || _delayedPackets.Count >= MaxDelayedPackets
+            if (!_acceptDelayedPackets || _delayerStopRequested)
+                return DelayedEnqueueResult.Stopping;
+
+            if (_delayedPackets.Count >= MaxDelayedPackets
                 || _delayedPacketBytes + packetLen > MaxDelayedBytes)
             {
                 LogDelayBackpressure();
-                return false;
+                return DelayedEnqueueResult.QueueFull;
             }
 
             int length = checked((int)packetLen);
@@ -380,11 +404,11 @@ public sealed class WinDivertThrottlingEngine : IThrottlingEngine
 
             long sequence = ++_delayedSequence;
             _delayedPackets.Enqueue(
-                new DelayedPacket(copy, packetLen, address),
-                new DelayedPacketPriority(dueTicks, sequence));
+                new DelayedPacket(copy, packetLen, address, schedule),
+                new DelayedPacketPriority(schedule.DueTicks, sequence));
             _delayedPacketBytes += packetLen;
             Monitor.PulseAll(_delayGate);
-            return true;
+            return DelayedEnqueueResult.Enqueued;
         }
     }
 
@@ -456,6 +480,10 @@ public sealed class WinDivertThrottlingEngine : IThrottlingEngine
             int err = Marshal.GetLastWin32Error();
             Log.Debug("Delayed WinDivertSend failed; err={Err} len={Len}", err, packet.PacketLength);
         }
+        else
+        {
+            RecordSuccessfulPacket(packet.Schedule);
+        }
     }
 
     private void LogDelayBackpressure()
@@ -468,7 +496,7 @@ public sealed class WinDivertThrottlingEngine : IThrottlingEngine
         if (Interlocked.CompareExchange(ref _lastDelayBackpressureLogTicks, now, last) == last)
         {
             Log.Warning(
-                "Delayed packet queue is full or stopping; reinjecting packet immediately to preserve connectivity. queuedPackets={QueuedPackets} queuedBytes={QueuedBytes}",
+                "Delayed packet queue is full; dropping excess limited traffic so the configured cap remains enforced. queuedPackets={QueuedPackets} queuedBytes={QueuedBytes}",
                 _delayedPackets.Count,
                 _delayedPacketBytes);
         }
@@ -477,9 +505,9 @@ public sealed class WinDivertThrottlingEngine : IThrottlingEngine
     /// <summary>
     /// Look up the owning PID for the local endpoint of <paramref name="p"/>,
     /// find a matching rule, and reserve tokens. Returns the stopwatch timestamp when the
-    /// packet should be reinjected.
+    /// packet should be reinjected, along with the metadata recorded after a successful send.
     /// </summary>
-    private long ApplyRules(PacketHeaders.Parsed p, bool outbound, long nowTicks)
+    private PacketSchedule ApplyRules(PacketHeaders.Parsed p, bool outbound, long nowTicks)
     {
         var compiled = Volatile.Read(ref _compiled);
         var snap = Volatile.Read(ref _connSnapshot);
@@ -488,39 +516,65 @@ public sealed class WinDivertThrottlingEngine : IThrottlingEngine
         var localAddr = outbound ? p.SrcAddress : p.DstAddress;
         int localPort = outbound ? p.SrcPort : p.DstPort;
 
-        // Try exact match first, then 0.0.0.0 (listener) entry.
+        // Try exact match first, then the address-family wildcard listener entry.
         int pid = -1;
         if (snap.TryGetValue(new ConnectionTable.ConnectionKey(p.Protocol, localAddr, localPort), out var found))
             pid = found;
-        else if (snap.TryGetValue(new ConnectionTable.ConnectionKey(p.Protocol, System.Net.IPAddress.Any, localPort), out var anyFound))
+        else if (snap.TryGetValue(
+                     new ConnectionTable.ConnectionKey(
+                         p.Protocol,
+                         localAddr.AddressFamily == AddressFamily.InterNetworkV6
+                             ? System.Net.IPAddress.IPv6Any
+                             : System.Net.IPAddress.Any,
+                         localPort),
+                     out var anyFound))
             pid = anyFound;
 
-        if (pid <= 0 || pid == 4) return nowTicks;
-
         int bytes = p.TotalLength;
+        if (pid <= 0 || pid == 4)
+            return PacketSchedule.Untracked(nowTicks);
 
-        // Always tally per-PID for the live usage display, even if no rule matches.
-        var counters = _pidCounters.GetOrAdd(pid, static _ => new ProcessCounters());
-        if (outbound) Interlocked.Add(ref counters.UploadBytes, bytes);
-        else Interlocked.Add(ref counters.DownloadBytes, bytes);
+        if (compiled.IsEmpty)
+            return new PacketSchedule(nowTicks, pid, bytes, outbound, null, null);
 
-        if (compiled.IsEmpty) return nowTicks;
         var ruleState = compiled.MatchByPid(pid);
-        if (ruleState is null) return nowTicks;
+        if (ruleState is null)
+            return new PacketSchedule(nowTicks, pid, bytes, outbound, null, null);
 
         if (outbound)
         {
-            Interlocked.Add(ref ruleState.UploadBytesThisSecond, bytes);
             if (ruleState.UploadBucket is { } up)
-                return up.Reserve(bytes);
+                return new PacketSchedule(up.Reserve(bytes), pid, bytes, true, ruleState, up);
         }
         else
         {
-            Interlocked.Add(ref ruleState.DownloadBytesThisSecond, bytes);
             if (ruleState.DownloadBucket is { } down)
-                return down.Reserve(bytes);
+                return new PacketSchedule(down.Reserve(bytes), pid, bytes, false, ruleState, down);
         }
-        return nowTicks;
+
+        return new PacketSchedule(nowTicks, pid, bytes, outbound, ruleState, null);
+    }
+
+    private void RecordSuccessfulPacket(PacketSchedule schedule)
+    {
+        if (schedule.ProcessId <= 0 || schedule.Bytes <= 0)
+            return;
+
+        // Measure bytes that were actually reinjected, rather than bytes merely captured or
+        // later discarded under backpressure. This keeps the UI aligned with effective traffic.
+        var counters = _pidCounters.GetOrAdd(schedule.ProcessId, static _ => new ProcessCounters());
+        if (schedule.Outbound)
+        {
+            Interlocked.Add(ref counters.UploadBytes, schedule.Bytes);
+            if (schedule.RuleState is { } rule)
+                Interlocked.Add(ref rule.UploadBytesThisSecond, schedule.Bytes);
+        }
+        else
+        {
+            Interlocked.Add(ref counters.DownloadBytes, schedule.Bytes);
+            if (schedule.RuleState is { } rule)
+                Interlocked.Add(ref rule.DownloadBytesThisSecond, schedule.Bytes);
+        }
     }
 
     private void EmitThroughput()
@@ -563,10 +617,29 @@ internal sealed class ProcessCounters
     public long UploadBytes;
 }
 
+internal enum DelayedEnqueueResult
+{
+    Enqueued,
+    QueueFull,
+    Stopping,
+}
+
+internal readonly record struct PacketSchedule(
+    long DueTicks,
+    int ProcessId,
+    int Bytes,
+    bool Outbound,
+    RuleState? RuleState,
+    TokenBucket? ReservationBucket)
+{
+    public static PacketSchedule Untracked(long dueTicks) => new(dueTicks, -1, 0, false, null, null);
+}
+
 internal readonly record struct DelayedPacket(
     byte[] Packet,
     uint PacketLength,
-    WinDivertNative.Address Address);
+    WinDivertNative.Address Address,
+    PacketSchedule Schedule);
 
 internal readonly record struct DelayedPacketPriority(long DueTicks, long Sequence) : IComparable<DelayedPacketPriority>
 {
@@ -622,6 +695,8 @@ internal sealed class CompiledRules
 internal sealed class RuleState
 {
     private const int MinimumBurstBytes = 1500;
+    private const int MaximumBurstBytes = 256 * 1024;
+    private const double BurstWindowSeconds = 0.05;
 
     public Guid RuleId { get; }
     public TokenBucket? DownloadBucket { get; }
@@ -644,10 +719,16 @@ internal sealed class RuleState
         _value = RuleMatchNormalizer.NormalizeForComparison(r.MatchKind, r.MatchValue);
 
         if (r.DownloadBytesPerSecond > 0)
-            DownloadBucket = new TokenBucket(r.DownloadBytesPerSecond, Math.Max(r.DownloadBytesPerSecond, MinimumBurstBytes));
+            DownloadBucket = new TokenBucket(r.DownloadBytesPerSecond, CalculateBurstCapacity(r.DownloadBytesPerSecond));
         if (r.UploadBytesPerSecond > 0)
-            UploadBucket = new TokenBucket(r.UploadBytesPerSecond, Math.Max(r.UploadBytesPerSecond, MinimumBurstBytes));
+            UploadBucket = new TokenBucket(r.UploadBytesPerSecond, CalculateBurstCapacity(r.UploadBytesPerSecond));
     }
+
+    private static double CalculateBurstCapacity(long bytesPerSecond)
+        => Math.Clamp(
+            Math.Ceiling(bytesPerSecond * BurstWindowSeconds),
+            MinimumBurstBytes,
+            MaximumBurstBytes);
 
     public bool Matches(int pid)
     {
